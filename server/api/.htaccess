@@ -1,0 +1,24 @@
+# Weland API — route every /api/* request to index.php,
+# except real files (install.php, etc.) which are served directly.
+Options -Indexes
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /api/
+
+  # Pass the Authorization header through to PHP
+  # (some cPanel/CGI setups strip it otherwise)
+  RewriteCond %{HTTP:Authorization} .
+  RewriteRule ^ - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
+  # Serve real files/folders as-is (install.php, schema.sql, ...)
+  RewriteCond %{REQUEST_FILENAME} -f [OR]
+  RewriteCond %{REQUEST_FILENAME} -d
+  RewriteRule ^ - [L]
+
+  # Everything else -> front controller
+  RewriteRule ^ index.php [L]
+</IfModule>
+
+# Fallback for the Authorization header on CGI/FastCGI
+SetEnvIf Authorization "(.*)" HTTP_AUTHORIZATION=$1

@@ -1,0 +1,80 @@
+@import 'tailwindcss';
+
+/* ------------------------------------------------------------------ */
+/*  Weland design tokens — emerald / slate, single sans-serif family  */
+/* ------------------------------------------------------------------ */
+@theme {
+  /* Surfaces */
+  --color-canvas: #fafdf7; /* warm off-white page background */
+  --color-card: #ffffff;
+  --color-line: #e2e8f0; /* slate-200 */
+
+  /* Text / ink */
+  --color-dark: #0f1f12; /* near-black green — primary ink */
+  --color-text: #0f1f12;
+  --color-muted: #64748b; /* slate-500 */
+
+  /* Status accents (emerald / red — no blue or purple).
+     Badges use literal emerald-/amber-/red- utilities; these back the
+     few semantic text usages (positive figures, errors). */
+  --color-success: #047857; /* emerald-700 */
+  --color-danger: #b91c1c; /* red-700 */
+
+  /* Typography — one sans-serif family across the whole UI.
+     serif/display tokens are kept (a few components still reference them)
+     but now resolve to DM Sans, so every heading matches the body text. */
+  --font-sans: 'DM Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-serif: 'DM Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-display: 'DM Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  /* Radius */
+  --radius-card: 16px; /* rounded-2xl for cards */
+
+  /* Elevation — flat, shadow-sm only */
+  --shadow-soft: 0 1px 2px 0 rgb(15 31 18 / 0.06);
+  --shadow-pop: 0 1px 2px 0 rgb(15 31 18 / 0.06);
+}
+
+/* ------------------------------------------------------------------ */
+/*  Base                                                              */
+/* ------------------------------------------------------------------ */
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    margin: 0;
+    background-color: var(--color-canvas);
+    color: var(--color-dark);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-sans);
+    font-weight: 600;
+  }
+
+  /* Emerald focus ring for keyboard users */
+  :focus-visible {
+    outline: 2px solid #047857;
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e1 transparent;
+  }
+}
+
+@layer utilities {
+  .nums {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum';
+  }
+}
