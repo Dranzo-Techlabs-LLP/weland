@@ -46,7 +46,6 @@ export function Login() {
             <button type="submit" disabled={submitting} className="h-10 w-full rounded-lg bg-emerald-700 text-sm font-semibold text-white transition-colors hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-60">{submitting ? 'Signing in…' : 'Sign in'}</button>
           </form>
         </div>
-        <p className="mt-4 text-center text-xs text-slate-400">Demo: admin@weland.co · admin123</p>
       </div>
     </div>
   )
