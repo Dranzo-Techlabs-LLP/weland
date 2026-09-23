@@ -4,8 +4,29 @@
     {
       "name": "weland-dev",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
       "port": 5173
+    },
+    {
+      "name": "weland-website",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev:site"
+      ],
+      "port": 3050
+    },
+    {
+      "name": "weland-preview",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "preview:all"
+      ],
+      "port": 8080
     }
   ]
 }

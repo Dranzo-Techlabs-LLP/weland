@@ -28,7 +28,7 @@ export function Login() {
     <div className="flex min-h-screen items-center justify-center bg-canvas px-5 py-10">
       <div className="w-full max-w-sm">
         <div className="mb-6 text-center">
-          <img src="/weland-logo.png" alt={PROPERTY_NAME} className="mx-auto mb-3 h-24 w-24 rounded-full shadow-sm" />
+          <img src={`${import.meta.env.BASE_URL}weland-logo.png`} alt={PROPERTY_NAME} className="mx-auto mb-3 h-24 w-24 rounded-full shadow-sm" />
           <h1 className="text-2xl font-semibold tracking-tight text-dark">{PROPERTY_NAME}</h1>
           <p className="mt-1 text-sm text-slate-500">Property admin</p>
         </div>

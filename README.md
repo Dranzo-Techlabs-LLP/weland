@@ -1,17 +1,89 @@
 # Weland
 
-A property & short-stay management **admin dashboard** — a single-page web app for managing
-villas, homestays and resorts. Built with React, Vite, TypeScript, Tailwind CSS and React Router,
-running entirely on seeded mock data (no backend required for v1).
+Everything for **We Land Resort, Kakkadampoyil** on one domain:
+
+| URL | What | Source | Built with |
+| --- | --- | --- | --- |
+| `/` | Public website | `website/` | Next.js, exported as static HTML |
+| `/admin` | Property admin dashboard | `src/`, `public/` | React, Vite, Tailwind, React Router |
+| `/api` | Backend for both | `server/api/` | PHP + MySQL |
+
+On the server, all three sit in `public_html` and are routed by `.htaccess` files
+(`deploy/.htaccess` at the root, plus one each in `admin/` and `api/`). No Node
+process is needed in production.
+
+## How the URLs fit together
+
+- The **website** owns the root. Its enquiry form posts to `POST /api/enquiry`,
+  which emails the resort (see *Enquiry email* below).
+- The **admin** lives under `/admin`: `vite.config.ts` sets `base: '/admin/'` and
+  the router takes its basename from that, so every admin page and asset stays
+  under `/admin` (`/admin/login`, `/admin/bookings/…`).
+- The **API** stays at `/api`, shared by both.
+- The admin used to live at the root, so old bookmarks such as `/login` or
+  `/bookings/KV-00012` redirect to the same page under `/admin`.
 
 ## Getting started
 
 ```bash
-npm install
-npm run dev
+npm install                    # admin app
+npm install --prefix website   # website
 ```
 
-Then open the printed URL (default **http://localhost:5173**).
+| Command | What it runs |
+| --- | --- |
+| `npm run dev` | Admin at **http://localhost:5173/admin/** |
+| `npm run dev:site` | Website at **http://localhost:3050** |
+| `npm run build:all` | Builds both and assembles **`dist/`**, laid out exactly like `public_html` |
+| `npm run preview:all` | Serves `dist/` at **http://localhost:8080** with the production routing (needs `php` on your PATH, e.g. XAMPP) |
+
+In dev, point either app at a running API with `VITE_API_BASE` (admin) or
+`NEXT_PUBLIC_API_BASE` (website) in a `.env.local` — for example the live one,
+`https://weland.dranzo.com/api`. `preview:all` uses the API in `server/api/`
+with your local `server/api/config.php`.
+
+Smoke tests (Playwright for Python; run `preview:all` first):
+
+```bash
+python tests/test_routing.py                                   # URL map, API, admin + website together
+WELAND_URL=http://localhost:8080 python website/tests/test_site.py   # the website in depth
+```
+
+## Deploying (cPanel)
+
+1. Run `npm run build:all`.
+2. Upload **the contents of `dist/`** to `public_html`, including the hidden
+   `.htaccess` files, overwriting what is there. `dist/api/` never contains
+   `config.php`, so the server's copy (with the database password) is left alone.
+3. The first time only, delete the admin files left at the root by the old
+   layout: `public_html/assets/`, `favicon.png`, `weland-logo.png`, `weland.svg`.
+   They now live in `public_html/admin/`. **Do not delete `api/`.**
+4. The first time only, add the enquiry settings to `public_html/api/config.php`
+   (see `server/api/config.example.php`):
+
+   ```php
+   const ENQUIRY_TO_EMAIL = 'reservations@example.com';     // who receives website enquiries
+   const ENQUIRY_FROM_EMAIL = 'enquiry@weland.dranzo.com';  // a mailbox on this domain
+   ```
+
+   and create the `ENQUIRY_FROM_EMAIL` mailbox in cPanel → Email Accounts so the
+   mail isn't marked as spam.
+5. Staff now sign in at **https://weland.dranzo.com/admin**.
+
+### Enquiry email
+
+`POST /api/enquiry` needs no session. It validates the form, drops submissions
+that fill the hidden honeypot field, and sends a plain-text email with PHP
+`mail()`, with the guest's address as Reply-To. Guests only see "Enquiry sent"
+if the mail was handed to the server; if `ENQUIRY_TO_EMAIL` is missing or
+`mail()` fails, they're asked to call or WhatsApp, and the enquiry is written to
+the PHP error log so it isn't lost. For local work, set
+`const ENQUIRY_LOG_ONLY = true;` in your local `config.php` to log instead of
+mailing.
+
+---
+
+# Admin app
 
 ## Signing in
 
@@ -26,11 +98,11 @@ buttons are on the login page):
 Sign out with the **Logout** button (top-right); it clears the session and returns to
 the login screen. Sessions persist across refresh via `localStorage`.
 
-Other scripts:
+Admin-only scripts:
 
 ```bash
-npm run build     # type-check (tsc -b) + production build to /dist
-npm run preview   # serve the production build locally
+npm run build     # type-check (tsc -b) + production build to dist/admin
+npm run preview   # serve the admin build alone at http://localhost:4173/admin/
 npm run lint      # tsc --noEmit type-check
 ```
 

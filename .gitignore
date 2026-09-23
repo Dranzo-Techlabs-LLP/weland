@@ -33,3 +33,6 @@ server/api/config.php
 # Local run + TS build cache
 .localrun/
 *.tsbuildinfo
+
+# Local test output
+tests/screenshots

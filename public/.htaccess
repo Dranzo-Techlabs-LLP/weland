@@ -1,19 +1,16 @@
-# Weland SPA — Apache config for cPanel
+# Weland admin SPA — lives at /admin (public_html/admin/.htaccess on cPanel)
 Options -Indexes
 
 <IfModule mod_rewrite.c>
   RewriteEngine On
-  RewriteBase /
-
-  # Never touch the API — let public_html/api/.htaccess handle it
-  RewriteRule ^api(/|$) - [L]
+  RewriteBase /admin/
 
   # Serve real files and directories as-is
   RewriteCond %{REQUEST_FILENAME} -f [OR]
   RewriteCond %{REQUEST_FILENAME} -d
   RewriteRule ^ - [L]
 
-  # Everything else falls through to the SPA entry point (client-side routing)
+  # Everything else under /admin falls through to the SPA (client-side routing)
   RewriteRule ^ index.html [L]
 </IfModule>
 

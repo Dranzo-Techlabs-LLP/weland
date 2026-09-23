@@ -1,4 +1,6 @@
 @import 'tailwindcss';
+/* The public website (website/) has its own CSS; keep it out of the admin build. */
+@source not "../website";
 
 /* ------------------------------------------------------------------ */
 /*  Weland design tokens — emerald / slate, single sans-serif family  */

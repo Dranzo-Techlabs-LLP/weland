@@ -16,7 +16,7 @@ export function Topbar({ onMenu }: TopbarProps) {
       >
         <Menu size={20} />
       </button>
-      <img src="/weland-logo.png" alt={PROPERTY_NAME} className="h-8 w-8 rounded-full object-cover" />
+      <img src={`${import.meta.env.BASE_URL}weland-logo.png`} alt={PROPERTY_NAME} className="h-8 w-8 rounded-full object-cover" />
       <span className="text-lg font-semibold text-dark">{PROPERTY_NAME}</span>
     </header>
   )

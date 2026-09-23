@@ -18,13 +18,25 @@ const DB_CHARSET = 'utf8mb4';
 // ---- Guards install.php in the browser. (Terminal `php install.php` needs no key.) ----
 const INSTALL_KEY = '__SET_INSTALL_KEY__';
 
+// ---- Website enquiry form (POST /api/enquiry) ----
+//  Where enquiries from the website are emailed. While this is empty the form
+//  asks guests to call or WhatsApp instead (the details still go to the PHP
+//  error log, so nothing is lost).
+const ENQUIRY_TO_EMAIL = '';
+//  Sender address. Use a mailbox on this domain so the mail isn't marked spam.
+const ENQUIRY_FROM_EMAIL = 'enquiry@weland.dranzo.com';
+//  Local development only: write enquiries to the error log instead of mailing.
+const ENQUIRY_LOG_ONLY = false;
+
 // ---- Origins allowed to call this API from a browser ----
-//  (In production the SPA and API share the same origin, so CORS is not
-//   even needed there; the localhost entries are only for `npm run dev`.)
+//  (In production the website, the admin SPA and the API share one origin, so
+//   CORS is not even needed there; the localhost entries are only for dev:
+//   5173 = admin `npm run dev`, 3050 = website `npm run dev:site`.)
 const ALLOWED_ORIGINS = [
   'https://weland.dranzo.com',
   'http://localhost:5173',
   'http://localhost:5199',
+  'http://localhost:3050',
 ];
 
 function cors(): void {

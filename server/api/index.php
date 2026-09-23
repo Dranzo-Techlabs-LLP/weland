@@ -32,6 +32,82 @@ try {
     json_out(['token' => $token, 'user' => public_user($u, true)]);
   }
 
+  // ---------- Public: enquiry form on the website ----------
+  //  The marketing site at "/" posts here; no session needed. Mails the resort
+  //  at ENQUIRY_TO_EMAIL (config.php). Guests are only told "sent" when the
+  //  mail was actually handed to the server; otherwise they're asked to call.
+  if ($method === 'POST' && $path === 'enquiry') {
+    $b = body();
+
+    // Honeypot: hidden from people, filled in by bots. Pretend it worked.
+    if (trim((string)($b['website'] ?? '')) !== '') json_out(['ok' => true]);
+
+    // One-line fields: strip CR/LF so nothing can leak into mail headers.
+    $line = fn(string $k): string => trim(preg_replace('/[\r\n]+/', ' ', (string)($b[$k] ?? '')));
+    $e = [
+      'name'     => $line('name'),
+      'phone'    => $line('phone'),
+      'email'    => $line('email'),
+      'stay'     => $line('stay'),
+      'checkIn'  => $line('checkIn'),
+      'checkOut' => $line('checkOut'),
+      'guests'   => (int)($b['guests'] ?? 0),
+      'notes'    => trim((string)($b['notes'] ?? '')),
+    ];
+    $isDate = fn(string $d): bool => (bool)preg_match('/^\d{4}-\d{2}-\d{2}$/', $d)
+      && checkdate((int)substr($d, 5, 2), (int)substr($d, 8, 2), (int)substr($d, 0, 4));
+
+    if (strlen($e['name']) < 2 || strlen($e['name']) > 200) fail('Enter your name.');
+    if (strlen(preg_replace('/\D/', '', $e['phone'])) < 10 || strlen($e['phone']) > 40) fail('Enter a phone number with at least 10 digits.');
+    if (!filter_var($e['email'], FILTER_VALIDATE_EMAIL)) fail('Enter a valid email address.');
+    if ($e['stay'] === '' || strlen($e['stay']) > 100) fail('Choose a stay.');
+    if (!$isDate($e['checkIn']) || !$isDate($e['checkOut'])) fail('Choose your dates.');
+    if ($e['checkOut'] <= $e['checkIn']) fail('Check-out must be after check-in.');
+    if ($e['guests'] < 1 || $e['guests'] > 50) fail('Choose the number of guests.');
+    if (strlen($e['notes']) > 6000) fail('Keep the note under a few paragraphs.');
+
+    $text = implode("\n", [
+      'New enquiry from the website',
+      '',
+      "Name:      {$e['name']}",
+      "Phone:     {$e['phone']}",
+      "Email:     {$e['email']}",
+      "Stay:      {$e['stay']}",
+      "Check-in:  {$e['checkIn']}",
+      "Check-out: {$e['checkOut']}",
+      "Guests:    {$e['guests']}",
+      '',
+      $e['notes'] !== '' ? "Notes:\n{$e['notes']}" : 'Notes: none',
+    ]);
+
+    // Local development: log instead of mailing (see config.example.php).
+    if (defined('ENQUIRY_LOG_ONLY') && ENQUIRY_LOG_ONLY === true) {
+      error_log("[weland enquiry] (log only)\n$text");
+      json_out(['ok' => true, 'delivered' => false]);
+    }
+
+    // Constants are read with defined() so an older config.php keeps working.
+    $to = defined('ENQUIRY_TO_EMAIL') ? trim((string)ENQUIRY_TO_EMAIL) : '';
+    if ($to === '') {
+      error_log("[weland enquiry] ENQUIRY_TO_EMAIL is not set; enquiry NOT mailed\n$text");
+      fail('The enquiry could not be sent. Please call or WhatsApp us.', 503);
+    }
+    $host = preg_replace('/[^a-z0-9.-]/i', '', (string)($_SERVER['HTTP_HOST'] ?? 'localhost'));
+    $from = defined('ENQUIRY_FROM_EMAIL') && ENQUIRY_FROM_EMAIL !== '' ? ENQUIRY_FROM_EMAIL : "no-reply@$host";
+
+    $subject = "Website enquiry: {$e['stay']}, {$e['checkIn']} to {$e['checkOut']} ({$e['name']})";
+    $sent = @mail($to, '=?UTF-8?B?' . base64_encode($subject) . '?=', $text, [
+      'From'         => "We Land Resort website <$from>",
+      'Reply-To'     => $e['email'],
+      'Content-Type' => 'text/plain; charset=UTF-8',
+    ]);
+    if (!$sent) {
+      error_log("[weland enquiry] mail() failed; enquiry NOT mailed\n$text");
+      fail('The enquiry could not be sent. Please call or WhatsApp us.', 500);
+    }
+    json_out(['ok' => true, 'delivered' => true]);
+  }
+
   // ---------- Everything below requires a valid session ----------
   $me = require_user();
 

@@ -18,7 +18,7 @@ export function Sidebar({ onNavigate, onClose }: SidebarProps) {
     <div className="flex h-full w-64 flex-col border-r border-slate-200 bg-white">
       {/* Header */}
       <div className="flex h-16 items-center gap-2.5 border-b border-slate-100 px-4">
-        <img src="/weland-logo.png" alt={PROPERTY_NAME} className="h-9 w-9 shrink-0 rounded-full object-cover" />
+        <img src={`${import.meta.env.BASE_URL}weland-logo.png`} alt={PROPERTY_NAME} className="h-9 w-9 shrink-0 rounded-full object-cover" />
         <div className="min-w-0 leading-tight">
           <div className="truncate font-serif text-[15px] font-semibold text-dark">{PROPERTY_NAME}</div>
           <div className="text-[10px] font-semibold uppercase tracking-widest text-emerald-700">{PROPERTY_TAGLINE}</div>
