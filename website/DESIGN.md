@@ -43,7 +43,7 @@ right, and a reservation strip docked beneath both. That strip is the
 primary CTA.
 
 ```
-| (W) We Land   Stays  Conference hall  A day here  …   [Reserve a stay]  |
+| (W) We Land   Stays  Conference hall  Dining  …       [Reserve a stay]  |
 |------------------------------------|-----------------------------------|
 |  [ logo badge ]                    |                                   |
 |  A hilltop in Kakkadampoyil,       |        hero photo panel           |
@@ -52,10 +52,10 @@ primary CTA.
 |------------------------------------|-----------------------------------|
 | Check-in [   ]  Check-out [   ]  Guests [ ]      [Check availability]  |
 |------------------------------------------------------------------------|
-| About — facts list + claim, then a wide aerial                          |
+| About — facts list + claim                                              |
+| Above the mist — pinned aerial photo; scroll sinks the morning cloud    |
 | Stays — rooms band (+ room-by-room grid), dormitory band                |
 | Conference hall — text + facts, main photo + three details              |
-| A day here — timed schedule (a real sequence, so times are shown)       |
 | Dining · Gallery (dense 4-col) · Getting here (map + route table)       |
 | Enquire — wine panel, gold accents, form pre-filled from the strip      |
 | Footer                                                                   |
@@ -68,10 +68,17 @@ primary CTA.
 - Spend boldness once: the wine display line and the gold CTA on the dark
   panel. Everything else quiet.
 - No cards. Content sits in bands and lists; 1px rules appear only where
-  they separate data (spec tables, the day schedule, route table).
+  they separate data (spec tables, route table).
 - Sentence case everywhere. No all-caps labels, no eyebrows, no "→" on links.
-- Motion: one page-load moment in the hero; otherwise motion only answers a
-  click (the strip scrolling to the form, the mobile menu).
+- Motion: spent once, on "Above the mist". Scrolling starts inside a morning
+  cloud and sinks it into the valley until the resort stands clear on its
+  hilltop: volumetric fog (WebGL2, ray-marched) over the real aerial photo, lit
+  in the photo's own blue-hour colours so the two read as one picture. Natural,
+  not illustrated: no drawn clouds or models. Elsewhere motion stays small (the
+  hero photo drifts, room and hall photos settle, gallery tiles reveal) and
+  answers clicks (the strip scrolling to the form, the mobile menu).
+- Reduced motion gets the still, clear view with all three lines; devices
+  without WebGL2 get a soft CSS mist that clears the same way.
 
 ## Reviewed against the generic default
 

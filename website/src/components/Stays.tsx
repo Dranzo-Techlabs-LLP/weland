@@ -78,7 +78,9 @@ export default function Stays() {
               {stay.units && (
                 <div className="units">
                   <h4 className="units-title">Room by room</h4>
-                  <ul className="units-grid">
+                  <p className="units-hint">Swipe to see all {stay.units.length} rooms.</p>
+                  {/* focusable so the row can be scrolled from the keyboard when it becomes a carousel */}
+                  <ul className="units-grid" tabIndex={0} aria-label="The rooms, one by one">
                     {stay.units.map((u) => (
                       <li key={u.id} className="unit">
                         <div className="unit-media">

@@ -38,26 +38,29 @@ export default function Navbar() {
           </span>
         </a>
 
+        {/* Inline links from 1200px; below that they're in the menu */}
         <nav className="nav-links" aria-label="Main">
           {nav.map((item) => (
             <a key={item.href} href={item.href} className="nav-link">
               {item.label}
             </a>
           ))}
-          <a href="#enquire" className="btn btn-primary">
-            Reserve a stay
-          </a>
         </nav>
 
-        <button
-          type="button"
-          className="nav-toggle"
-          aria-label="Open menu"
-          aria-expanded={open}
-          onClick={() => setOpen(true)}
-        >
-          <Menu size={24} />
-        </button>
+        <div className="nav-actions">
+          <a href="#enquire" className="btn btn-primary nav-cta">
+            Reserve a stay
+          </a>
+          <button
+            type="button"
+            className="nav-toggle"
+            aria-label="Open menu"
+            aria-expanded={open}
+            onClick={() => setOpen(true)}
+          >
+            <Menu size={24} />
+          </button>
+        </div>
       </div>
 
       {open && (

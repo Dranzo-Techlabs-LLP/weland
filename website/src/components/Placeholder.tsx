@@ -86,31 +86,31 @@ export default function Placeholder({
     return (
       <div className="ph" role="img" aria-label={caption}>
         <svg className="ph-svg" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid slice" aria-hidden="true">
-          <rect width={W} height={H} fill="#e3e8e4" />
+          <rect width={W} height={H} fill="#efe6e1" />
           {rings.map((r, i) => (
             <path
               key={r}
               d={contourPath(random, 430, 300, r)}
-              fill={i % 2 === 0 ? "#dde3df" : "#e6ebe7"}
-              stroke="#b7c3bd"
+              fill={i % 2 === 0 ? "#e9ddd7" : "#f2eae5"}
+              stroke="#c9b4b0"
               strokeWidth="1.2"
             />
           ))}
-          <path d="M0 470 C 140 430, 260 520, 420 480 S 700 420, 800 470" fill="none" stroke="#f9f9f6" strokeWidth="7" />
-          <path d="M0 470 C 140 430, 260 520, 420 480 S 700 420, 800 470" fill="none" stroke="#c9d3ce" strokeWidth="2" />
-          <circle cx="430" cy="300" r="9" fill="#9c3d25" />
-          <circle cx="430" cy="300" r="20" fill="none" stroke="#9c3d25" strokeWidth="2" opacity="0.5" />
+          <path d="M0 470 C 140 430, 260 520, 420 480 S 700 420, 800 470" fill="none" stroke="#fcf9f7" strokeWidth="7" />
+          <path d="M0 470 C 140 430, 260 520, 420 480 S 700 420, 800 470" fill="none" stroke="#d8c6c1" strokeWidth="2" />
+          <circle cx="430" cy="300" r="9" fill="#5e2432" />
+          <circle cx="430" cy="300" r="20" fill="none" stroke="#5e2432" strokeWidth="2" opacity="0.5" />
         </svg>
-        <span className="ph-caption" style={{ color: "#15201f" }}>{caption}</span>
+        <span className="ph-caption" style={{ color: "#2a1d21" }}>{caption}</span>
       </div>
     );
   }
 
   const layers = [
-    { base: 300, amp: 40, fill: "#c3cfc9" },
-    { base: 370, amp: 45, fill: "#8fa39c" },
-    { base: 440, amp: 40, fill: "#3f6b6c" },
-    { base: 520, amp: 30, fill: "#0f3a3f" },
+    { base: 300, amp: 40, fill: "#d9c3c0" },
+    { base: 370, amp: 45, fill: "#a17d82" },
+    { base: 440, amp: 40, fill: "#6e3b47" },
+    { base: 520, amp: 30, fill: "#451a25" },
   ];
   const sunX = 140 + random() * 520;
 
@@ -119,17 +119,17 @@ export default function Placeholder({
       <svg className="ph-svg" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid slice" aria-hidden="true">
         <defs>
           <linearGradient id={`${id}-sky`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stopColor="#e9eeeb" />
-            <stop offset="1" stopColor="#d3dcd7" />
+            <stop offset="0" stopColor="#f7f2ee" />
+            <stop offset="1" stopColor="#efe2d8" />
           </linearGradient>
           <linearGradient id={`${id}-mist`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stopColor="#f9f9f6" stopOpacity="0" />
-            <stop offset="0.5" stopColor="#f9f9f6" stopOpacity="0.55" />
-            <stop offset="1" stopColor="#f9f9f6" stopOpacity="0" />
+            <stop offset="0" stopColor="#fcf9f7" stopOpacity="0" />
+            <stop offset="0.5" stopColor="#fcf9f7" stopOpacity="0.55" />
+            <stop offset="1" stopColor="#fcf9f7" stopOpacity="0" />
           </linearGradient>
         </defs>
         <rect width={W} height={H} fill={`url(#${id}-sky)`} />
-        <circle cx={sunX} cy="200" r="46" fill="#9c3d25" opacity="0.28" />
+        <circle cx={sunX} cy="200" r="46" fill="#e8cf96" opacity="0.55" />
         {layers.map((l, i) => (
           <g key={i}>
             <path d={hillPath(random, l.base, l.amp)} fill={l.fill} />

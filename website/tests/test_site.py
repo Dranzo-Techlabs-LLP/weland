@@ -67,7 +67,7 @@ with sync_playwright() as p:
         "[...document.querySelectorAll('link[rel~=\"icon\"], link[rel=\"apple-touch-icon\"]')].map(l => l.getAttribute('href'))"
     )
     check("favicon links emitted", len(icons) >= 2, ", ".join(icons))
-    for sid in ["stays", "conference", "day", "dining", "gallery", "location", "enquire"]:
+    for sid in ["above-the-mist", "stays", "conference", "dining", "gallery", "location", "enquire"]:
         check(f"section #{sid} rendered", page.locator(f"#{sid}").count() == 1)
     check("two stay types listed (rooms, dormitory)", page.locator("article.stay").count() == 2)
     check("six rooms listed", page.locator(".unit").count() == 6)
@@ -91,7 +91,6 @@ with sync_playwright() as p:
     hero_loaded = page.evaluate("(() => { const i = document.querySelector('.hero-media img'); return !!i && i.naturalWidth > 0; })()")
     check("hero photo loaded", hero_loaded)
     check("map embed present", page.locator(".map iframe").count() == 1)
-    check("eight items in the day schedule", page.locator(".day-item").count() == 8)
     # next/font self-hosts under hashed family names (e.g. __Cormorant_Garamond_ab12cd),
     # so look through the loaded FontFace entries rather than document.fonts.check().
     fonts_ok = page.evaluate(
@@ -137,8 +136,15 @@ with sync_playwright() as p:
     # ---------- nav "Reserve a stay" CTA ----------
     page.evaluate("window.scrollTo(0, 0)")
     page.wait_for_timeout(300)
-    page.click("nav.nav-links a.btn")
-    page.wait_for_timeout(1200)
+    page.click(".nav .nav-cta")
+    # Wait for the outcome itself: the smooth scroll to the form can pause briefly
+    # as it passes the fog section (headless Chromium draws WebGL on the CPU).
+    try:
+        page.wait_for_function(
+            "() => Math.abs(document.getElementById('enquire').getBoundingClientRect().top) < 200", timeout=10000
+        )
+    except Exception:
+        pass
     top2 = page.evaluate("document.getElementById('enquire').getBoundingClientRect().top")
     check("nav 'Reserve a stay' scrolls to enquiry", -40 <= top2 <= 200, f"top={top2:.0f}px")
 
@@ -150,8 +156,13 @@ with sync_playwright() as p:
     m.goto(BASE)
     m.wait_for_load_state("networkidle")
     m.wait_for_timeout(1200)
-    overflow = m.evaluate("document.documentElement.scrollWidth - window.innerWidth")
-    check("mobile has no horizontal overflow", overflow <= 0, f"overflow={overflow}px")
+    # Compare with clientWidth, not innerWidth: when something is too wide, a mobile
+    # browser widens the whole layout (innerWidth grows too) and the overflow hides.
+    overflow = m.evaluate("document.documentElement.scrollWidth - document.documentElement.clientWidth")
+    layout = m.evaluate("window.innerWidth")
+    check("mobile has no horizontal overflow", overflow <= 0 and layout == 390, f"overflow={overflow}px, layout={layout}px")
+    toggle_right = m.evaluate("document.querySelector('.nav-toggle').getBoundingClientRect().right")
+    check("mobile menu button is on screen", toggle_right <= 390, f"right edge at {toggle_right:.0f}px")
     shot(m, "mobile-hero.png")
     shot(m, "mobile-full.png", full=True)
     m.click("button[aria-label='Open menu']")

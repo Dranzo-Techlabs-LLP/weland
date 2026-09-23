@@ -26,9 +26,12 @@ process is needed in production.
 ## Getting started
 
 ```bash
-npm install                    # admin app
-npm install --prefix website   # website
+npm install                  # admin app, in the repo root
+cd website && npm install    # website, inside its own folder
 ```
+
+(Don't use `npm install --prefix website` from the root: with no package name,
+npm installs the root folder itself into the website as a dependency.)
 
 | Command | What it runs |
 | --- | --- |

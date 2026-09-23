@@ -11,7 +11,7 @@ export default function WhatsAppFloat() {
       aria-label={`Message ${site.name} on WhatsApp`}
     >
       <MessageCircle size={20} aria-hidden="true" />
-      WhatsApp
+      <span className="wa-label">WhatsApp</span>
     </a>
   );
 }

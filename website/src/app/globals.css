@@ -20,7 +20,9 @@
   --band: clamp(72px, 10vw, 140px);
   --measure: 62ch;
   --radius: 6px;
-  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  /* strong ease-out; the same curve is registered in GSAP as "out" (ScrollMotion.tsx) */
+  --ease: cubic-bezier(0.23, 1, 0.32, 1);
+  --maxw: 1440px;
 }
 
 *,
@@ -148,6 +150,8 @@ ol {
 }
 
 .text-link {
+  /* vertical padding widens the tap target without moving inline text */
+  padding-block: 0.65em;
   text-decoration: underline;
   text-decoration-thickness: 1px;
   text-underline-offset: 0.2em;
@@ -293,6 +297,18 @@ ol {
   display: none;
   align-items: center;
   gap: 1.9rem;
+  margin-left: auto;
+}
+
+.nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Reserve button in the bar: hidden on phones (it's in the menu), shown from 600px */
+.nav-cta {
+  display: none;
 }
 
 .nav-link {
@@ -383,7 +399,15 @@ ol {
   }
 }
 
-@media (min-width: 900px) {
+@media (min-width: 600px) {
+  .nav-cta {
+    display: inline-flex;
+  }
+}
+
+/* Six links plus the button only fit on one line from 1200px; below that they
+   live in the menu (between 900 and 1200px they used to wrap onto two lines). */
+@media (min-width: 1200px) {
   .nav-links {
     display: flex;
   }
@@ -392,21 +416,38 @@ ol {
   }
 }
 
+/* Landscape phones: a slimmer bar so it doesn't eat a fifth of the screen */
+@media (orientation: landscape) and (max-height: 540px) {
+  .nav,
+  .nav.is-scrolled {
+    padding-block: 6px;
+  }
+  .brand {
+    font-size: 1.35rem;
+  }
+  .brand-mark {
+    width: 36px;
+    height: 36px;
+  }
+}
+
 /* ---------- hero ---------- */
 
 .hero {
+  /* lets the panel line its text up with the nav on very wide screens (cqw) */
+  container-type: inline-size;
   display: grid;
-  grid-template-columns: 1fr;
-  min-height: 100svh;
+  grid-template-columns: minmax(0, 1fr);
   background: var(--paper);
 }
 
+/* Phones and tablets: the photo comes first as a banner and the badge sits on its edge */
 .hero-panel {
-  padding: calc(84px + 4vh) var(--gutter) 40px;
+  padding: 0 var(--gutter) 44px;
   display: flex;
   flex-direction: column;
-  justify-content: flex-end;
-  gap: 2.2rem;
+  justify-content: flex-start;
+  gap: 1.5rem;
 }
 
 .hero-claim {
@@ -425,14 +466,20 @@ ol {
 }
 
 .hero-logo {
-  width: clamp(116px, 14vw, 186px);
+  position: relative;
+  z-index: 2; /* above the photo it overlaps */
+  width: clamp(96px, 24vw, 132px);
   height: auto;
+  margin-top: calc(clamp(96px, 24vw, 132px) / -2);
+  border: 4px solid var(--paper);
+  border-radius: 50%;
 }
 
 .hero-display {
   font-family: var(--font-display);
   font-weight: 500;
-  font-size: clamp(2.5rem, 5.2vw, 4.5rem);
+  /* the floor shrinks on the very narrowest phones so "Kakkadampoyil," still fits a line */
+  font-size: clamp(min(2.5rem, 13vw), 5.2vw, 4.5rem);
   line-height: 1.03;
   letter-spacing: -0.015em;
   max-width: 15ch;
@@ -452,10 +499,17 @@ ol {
 
 .hero-media {
   position: relative;
-  min-height: 52vw;
+  order: -1;
+  height: clamp(300px, 74vw, 560px);
   animation: reveal 1.2s var(--ease) 0.2s both;
-  border-radius: 0 0 0 clamp(48px, 9vw, 140px);
+  border-radius: 0 0 clamp(44px, 12vw, 96px) 0;
   overflow: hidden;
+}
+
+/* taller than its frame, so the scroll parallax never exposes an edge */
+.hero-media-inner {
+  position: absolute;
+  inset: -8% 0;
 }
 
 /* caption sits clear of the curved corner */
@@ -516,12 +570,61 @@ ol {
 @media (min-width: 900px) {
   .hero {
     grid-template-columns: 5fr 7fr;
+    min-height: 100svh;
   }
   .hero-panel {
-    padding-bottom: 56px;
+    padding: calc(84px + 4vh) var(--gutter) 56px;
+    justify-content: flex-end;
+    gap: 2.2rem;
+  }
+  .hero-logo {
+    width: clamp(116px, 14vw, 186px);
+    margin-top: 0;
+    border: 0;
   }
   .hero-media {
-    min-height: 0;
+    order: 0;
+    height: auto;
+    border-radius: 0 0 0 clamp(48px, 9vw, 140px);
+  }
+}
+
+/* Very wide screens: the hero text keeps to the same left edge as the nav */
+@media (min-width: 1480px) {
+  .hero {
+    grid-template-columns: calc((100% - var(--maxw)) / 2 + var(--maxw) * 5 / 12) 1fr;
+  }
+  .hero-panel {
+    padding-left: calc((100cqw - var(--maxw)) / 2 + var(--gutter));
+  }
+}
+
+/* Landscape phones: side by side like desktop, sized for a short screen */
+@media (orientation: landscape) and (max-height: 540px) and (min-width: 600px) and (max-width: 1199px) {
+  .hero {
+    grid-template-columns: 1fr 1fr;
+    min-height: 100svh;
+  }
+  .hero-panel {
+    padding: 64px var(--gutter) 20px;
+    justify-content: center;
+    gap: 0.9rem;
+  }
+  .hero-logo {
+    width: 64px;
+    margin-top: 0;
+    border: 0;
+  }
+  .hero-display {
+    font-size: clamp(1.5rem, 4.2vw, 2.2rem);
+  }
+  .hero-note {
+    display: none;
+  }
+  .hero-media {
+    order: 0;
+    height: auto;
+    border-radius: 0 0 0 48px;
   }
 }
 
@@ -535,8 +638,16 @@ ol {
 
 .strip-form {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  /* minmax(0, …): the date inputs' natural width must not push the page sideways */
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0;
+}
+
+/* the narrowest phones (a folded Galaxy Fold is 280px): one field per row */
+@media (max-width: 359px) {
+  .strip-form {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .strip-field {
@@ -555,6 +666,7 @@ ol {
 
 .strip-field input,
 .strip-field select {
+  min-width: 0;
   border: 0;
   background: transparent;
   padding: 0;
@@ -566,6 +678,14 @@ ol {
 .strip-field input:focus-visible,
 .strip-field select:focus-visible {
   outline-offset: 4px;
+}
+
+/* touch screens: date and guest pickers get a full-size target */
+@media (pointer: coarse) {
+  .strip-field input,
+  .strip-field select {
+    min-height: 44px;
+  }
 }
 
 .strip-submit {
@@ -604,31 +724,11 @@ ol {
 
 .about {
   padding-block: var(--band);
-  display: grid;
-  gap: clamp(40px, 6vw, 80px);
 }
 
 .about-grid {
   display: grid;
   gap: 40px;
-}
-
-.about-media {
-  position: relative;
-  aspect-ratio: 16 / 9;
-  border-radius: 8px;
-  overflow: hidden;
-}
-
-.about-caption {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  padding: 40px 20px 14px;
-  font-size: 0.85rem;
-  color: var(--paper);
-  background: linear-gradient(to top, rgba(42, 29, 33, 0.72), rgba(42, 29, 33, 0));
 }
 
 .about-facts {
@@ -672,9 +772,6 @@ ol {
   .about-grid {
     grid-template-columns: 4fr 8fr;
     gap: 64px;
-  }
-  .about-media {
-    aspect-ratio: 21 / 9;
   }
 }
 
@@ -774,6 +871,8 @@ ol {
 
 .stay {
   display: grid;
+  /* minmax(0, …): the swipeable room row must never widen the column past the screen */
+  grid-template-columns: minmax(0, 1fr);
   gap: 28px;
   padding-block: clamp(36px, 5vw, 64px);
   border-top: 1px solid var(--rule);
@@ -858,6 +957,40 @@ ol {
   max-width: 34ch;
 }
 
+.units-hint {
+  display: none;
+  font-size: 0.88rem;
+  color: var(--stone);
+  margin: -12px 0 16px;
+}
+
+/* Small phones: the six rooms become a swipeable row instead of a squeezed grid.
+   The row runs edge to edge; the next card peeks in to show there's more. */
+@media (max-width: 599px) {
+  .units-hint {
+    display: block;
+  }
+  .units-grid {
+    grid-template-columns: none;
+    grid-auto-flow: column;
+    grid-auto-columns: 78%;
+    gap: 14px;
+    margin-inline: calc(-1 * var(--gutter));
+    padding: 0 var(--gutter) 6px;
+    scroll-padding-inline: var(--gutter);
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+  }
+  .units-grid::-webkit-scrollbar {
+    display: none;
+  }
+  .unit {
+    scroll-snap-align: start;
+  }
+}
+
 @media (min-width: 900px) {
   .units-grid {
     grid-template-columns: repeat(3, 1fr);
@@ -934,72 +1067,12 @@ ol {
     align-items: end;
   }
   .stay {
-    grid-template-columns: 7fr 5fr;
+    grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
     gap: 40px 64px;
     align-items: start;
   }
   .stay:nth-child(even) .stay-media {
     order: 2;
-  }
-}
-
-/* ---------- a day here ---------- */
-
-.day {
-  padding-block: var(--band);
-  display: grid;
-  gap: 48px;
-}
-
-.day-intro {
-  display: grid;
-  gap: 20px;
-  align-self: start;
-}
-
-.day-list {
-  border-top: 1px solid var(--rule);
-}
-
-.day-item {
-  display: grid;
-  grid-template-columns: 84px 1fr;
-  gap: 16px;
-  padding-block: 22px;
-  border-bottom: 1px solid var(--rule);
-}
-
-.day-time {
-  font-size: 0.9rem;
-  font-weight: 500;
-  color: var(--gold-deep);
-  font-variant-numeric: tabular-nums;
-  padding-top: 6px;
-}
-
-.day-title {
-  font-family: var(--font-display);
-  font-weight: 500;
-  font-size: 1.55rem;
-  line-height: 1.1;
-}
-
-.day-text {
-  max-width: 50ch;
-  margin-top: 6px;
-}
-
-@media (min-width: 900px) {
-  .day {
-    grid-template-columns: 5fr 7fr;
-    gap: 80px;
-  }
-  .day-intro {
-    position: sticky;
-    top: 110px;
-  }
-  .day-item {
-    grid-template-columns: 120px 1fr;
   }
 }
 
@@ -1084,6 +1157,14 @@ ol {
 
 .gallery-item.is-tall {
   grid-row: span 2;
+}
+
+/* tablets: three columns instead of two very tall ones */
+@media (min-width: 600px) and (max-width: 899px) {
+  .gallery-grid {
+    grid-template-columns: repeat(3, 1fr);
+    grid-auto-rows: 27vw;
+  }
 }
 
 @media (min-width: 900px) {
@@ -1202,11 +1283,21 @@ ol {
 }
 
 .contact-list li {
+  border-bottom: 1px solid var(--rule-gold);
+}
+
+/* the whole row is the link, so it's an easy target on a phone */
+.contact-link {
   display: flex;
   gap: 12px;
   align-items: center;
+  min-height: 48px;
   padding-block: 12px;
-  border-bottom: 1px solid var(--rule-gold);
+}
+
+.contact-link:hover span {
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
 }
 
 .contact-list li:first-child {
@@ -1334,8 +1425,12 @@ ol {
 .footer-nav {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px 24px;
+  gap: 0 24px;
   font-size: 0.95rem;
+}
+
+.footer-nav a {
+  padding-block: 10px;
 }
 
 .footer-small {
@@ -1358,7 +1453,7 @@ ol {
 .wa {
   position: fixed;
   right: 18px;
-  bottom: 18px;
+  bottom: max(18px, env(safe-area-inset-bottom));
   z-index: 30;
   display: inline-flex;
   align-items: center;
@@ -1375,6 +1470,201 @@ ol {
 
 .wa:hover {
   background: #fff;
+}
+
+/* small phones: just the icon, so it covers less of the page */
+@media (max-width: 479px) {
+  .wa {
+    width: 52px;
+    height: 52px;
+    padding: 0;
+    justify-content: center;
+  }
+  .wa-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+}
+
+/* ---------- above the mist: a flight through cloud, tied to scroll (MistSection.tsx) ---------- */
+
+/* Base layout is the static one: no JavaScript, or reduced motion. */
+.mist {
+  position: relative;
+  background: #dde2ea; /* the cloud colour, so nothing flashes before the photo loads */
+}
+
+.mist-stage {
+  position: relative;
+  height: 88svh;
+  min-height: 520px;
+  overflow: hidden;
+}
+
+/* the real aerial photo of the resort; the flight scales it about the resort (JS sets the origin) */
+.mist-photo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 64% 45%;
+}
+
+/* Simple mist: stands in until the volumetric fog is ready, and on devices
+   without WebGL2. Same blue-hour colours as the fog (and the photo's own mist).
+   Hidden in the static layout (the view there is the clear one). */
+.mist-veil {
+  position: absolute;
+  inset: -8%;
+  opacity: 0;
+  background:
+    radial-gradient(55% 42% at 22% 28%, rgba(238, 241, 247, 0.96), rgba(238, 241, 247, 0) 70%),
+    radial-gradient(50% 48% at 78% 58%, rgba(226, 232, 242, 0.96), rgba(226, 232, 242, 0) 72%),
+    radial-gradient(70% 55% at 45% 88%, rgba(206, 216, 232, 0.94), rgba(206, 216, 232, 0) 72%),
+    linear-gradient(#e2e6ee, #c9d3e3);
+  filter: blur(6px);
+  pointer-events: none;
+}
+
+/* The volumetric fog. A hair of blur smooths the sampling pattern; drawn 2px
+   oversize so the blur never leaves a seam at the screen's edges. */
+.mist-clouds {
+  position: absolute;
+  inset: -2px;
+  width: calc(100% + 4px);
+  height: calc(100% + 4px);
+  display: block;
+  filter: blur(0.6px);
+}
+
+/* once the real fog is drawing, the simple mist steps aside */
+.mist-stage.is-clouded .mist-veil {
+  opacity: 0 !important;
+  transition: opacity 0.9s var(--ease);
+}
+
+/* keeps the words readable over the mountains (static layout: all three lines at once) */
+.mist-scrim {
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 80%;
+  background: linear-gradient(to bottom, rgba(246, 238, 233, 0.97), rgba(246, 238, 233, 0.86) 50%, rgba(246, 238, 233, 0));
+  pointer-events: none;
+}
+
+.mist-copy {
+  position: absolute;
+  top: clamp(92px, 14vh, 170px);
+  left: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.mist-beat {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: clamp(1.35rem, 2.4vw, 2rem);
+  line-height: 1.06;
+  letter-spacing: -0.015em;
+  max-width: 17ch;
+  color: var(--ink);
+}
+
+.mist-beat em {
+  font-style: italic;
+  font-weight: 400;
+  color: var(--wine);
+}
+
+/* the resort's name, pinned to the building in the photo (MistSection places it) */
+.mist-label {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+}
+
+.mist-label span {
+  position: relative;
+  display: block;
+  transform: translate(-50%, calc(-100% - 16px));
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(252, 249, 247, 0.94);
+  border: 1px solid var(--gold);
+  color: var(--wine-deep);
+  font-size: 0.85rem;
+  font-weight: 600;
+  white-space: nowrap;
+  box-shadow: 0 8px 24px -12px rgba(42, 29, 33, 0.45);
+}
+
+.mist-label span::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 100%;
+  width: 1px;
+  height: 14px;
+  background: var(--gold);
+}
+
+/* The flight: a tall scroll runway with the stage pinned while the camera rises
+   through the cloud. Only with JavaScript on and motion allowed. */
+@media (prefers-reduced-motion: no-preference) {
+  html.js .mist {
+    height: 280vh;
+  }
+  html.js .mist-stage {
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    height: 100svh;
+    min-height: 0;
+  }
+  html.js .mist-copy {
+    display: grid;
+  }
+  /* one line at a time over the sky: a lighter backdrop is enough */
+  html.js .mist-scrim {
+    height: 62%;
+    background: linear-gradient(to bottom, rgba(242, 236, 233, 0.92), rgba(242, 236, 233, 0.55) 45%, rgba(242, 236, 233, 0));
+  }
+  html.js .mist-beat {
+    grid-area: 1 / 1;
+    font-size: clamp(2rem, 4.6vw, 3.8rem);
+  }
+  html.js .mist-beat:not(:first-child),
+  html.js .mist-label {
+    opacity: 0;
+  }
+  /* the flight opens inside the cloud; the mist drifts slowly on its own */
+  html.js .mist-veil {
+    opacity: 1;
+    animation: mist-drift 22s ease-in-out infinite alternate;
+  }
+}
+
+@keyframes mist-drift {
+  from {
+    transform: translate3d(-2.5%, 0.5%, 0) scale(1.02);
+  }
+  to {
+    transform: translate3d(2.5%, -1%, 0) scale(1.06);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) and (max-width: 899px) {
+  html.js .mist {
+    height: 240vh;
+  }
 }
 
 /* ---------- motion ---------- */

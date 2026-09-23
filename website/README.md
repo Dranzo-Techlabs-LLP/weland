@@ -8,9 +8,16 @@ process: `npm run build:all` in the repo root puts it at the root of `dist/`,
 beside the admin app (`/admin`) and the PHP API (`/api`). See the root README
 for the URL map and deployment.
 
-Sections: split hero with booking strip → about → stays (six rooms, dormitory)
-→ conference hall → a day here → dining → gallery → getting here → enquiry
-form → footer, plus a WhatsApp link.
+Sections: split hero with booking strip → about → above the mist → stays (six
+rooms, dormitory) → conference hall → dining → gallery → getting here →
+enquiry form → footer, plus a WhatsApp link.
+
+"Above the mist" is the one big motion moment. As you scroll, the morning cloud
+over the aerial photo sinks into the valley and the resort comes up through it.
+The fog is ray-marched in WebGL2 (`src/components/mist/`). There's no 3D library,
+and it only draws while the section is on screen. Scroll effects use GSAP
+ScrollTrigger. With reduced motion you get the still photo; without WebGL2 a
+CSS mist does the same job.
 
 ## Run locally
 
@@ -27,12 +34,15 @@ have. To try the form in dev, set `NEXT_PUBLIC_API_BASE` in `.env.local` (see
 ## Test
 
 Playwright smoke test (page renders, "Check availability" pre-fills and scrolls
-to the form, the form submits through the API, mobile has no overflow).
+to the form, the form submits through the API, mobile has no overflow), and a
+motion test (the fog covers the view at the start and clears off the resort by
+the end, scroll effects, phone/tablet/wide layouts, reduced motion, no WebGL).
 Screenshots land in `tests/screenshots/`.
 
 ```bash
-pip install playwright && python -m playwright install chromium   # once
+pip install playwright pillow && python -m playwright install chromium   # once
 WELAND_URL=http://localhost:8080 python tests/test_site.py        # against preview:all
+WELAND_URL=http://localhost:8080 python tests/test_motion.py
 ```
 
 ## Content and photos
@@ -43,7 +53,7 @@ Everything editable is in `src/lib/content.ts`. Photos are pre-sized web copies
 
 | Source folder | Used for |
 |---------------|----------|
-| `GEN`  | hero (sky deck at sunset), about (aerial), dining (deck table), gallery (11 photos) |
+| `GEN`  | hero (sky deck at sunset), above the mist (aerial), dining (deck table), gallery (11 photos) |
 | `A1`–`A6` | "The Rooms" band and the room-by-room grid (one photo per room) |
 | `DOM`  | "The Dormitory" band (bunks, exterior, deck at dusk, washrooms) |
 | `HALL` | conference hall (wide shot, stage wall, carrom/seating, washrooms) |

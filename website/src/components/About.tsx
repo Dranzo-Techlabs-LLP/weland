@@ -1,5 +1,4 @@
-import Photo from "./Photo";
-import { images, site } from "@/lib/content";
+import { site } from "@/lib/content";
 
 export default function About() {
   return (
@@ -32,10 +31,6 @@ export default function About() {
           </p>
         </div>
       </div>
-      <figure className="about-media">
-        <Photo src={images.aerial.src} alt={images.aerial.alt} />
-        <figcaption className="about-caption">The resort from above: pool, terraces and the main building on the ridge.</figcaption>
-      </figure>
     </section>
   );
 }

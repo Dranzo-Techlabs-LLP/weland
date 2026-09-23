@@ -35,7 +35,12 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${cormorant.variable} ${karla.variable}`}>
+    // suppressHydrationWarning: the script below adds the "js" class before React hydrates
+    <html lang="en" className={`${cormorant.variable} ${karla.variable}`} suppressHydrationWarning>
+      <head>
+        {/* Runs before first paint, so scroll-driven layouts never flash their static form */}
+        <script dangerouslySetInnerHTML={{ __html: "document.documentElement.classList.add('js')" }} />
+      </head>
       <body>
         <Navbar />
         {children}

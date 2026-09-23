@@ -25,7 +25,6 @@ export const site = {
 
 export const images = {
   hero: { src: "/images/hero-sunset-deck.jpg", alt: "The We Land Resort sky deck and infinity pool at sunset, mountains fading into mist behind" },
-  aerial: { src: "/images/aerial-resort.jpg", alt: "Aerial view of the resort on its ridge, the pool and terraces surrounded by forest" },
   building: { src: "/images/building-day.jpg", alt: "The terracotta main building with its rooftop terrace and glass-fronted ground floor" },
   dining: { src: "/images/deck-dinner-sunset.jpg", alt: "A table set at the end of the sky deck at sunset, hills in every direction" },
 };
@@ -33,7 +32,6 @@ export const images = {
 export const nav = [
   { label: "Stays", href: "#stays" },
   { label: "Conference hall", href: "#conference" },
-  { label: "A day here", href: "#day" },
   { label: "Dining", href: "#dining" },
   { label: "Gallery", href: "#gallery" },
   { label: "Getting here", href: "#location" },
@@ -139,16 +137,16 @@ export const conference = {
   ],
 };
 
-export const day = [
-  { time: "6:30 am", title: "Mist on the sky deck", text: "Walk out along the deck while the valley is still under cloud. It hangs over the edge of the ridge; the mist usually lifts by half past seven." },
-  { time: "8:00 am", title: "Breakfast", text: "Puttu, appam, dosa and filter coffee on the terrace, looking down the valley." },
-  { time: "10:30 am", title: "Pool", text: "The infinity pool faces the mountains and is quietest in the morning. The play area beside it keeps children busy." },
-  { time: "1:00 pm", title: "Lunch", text: "A Kerala meal on banana leaf, or something lighter if you ask in the morning." },
-  { time: "3:30 pm", title: "Waterfalls", text: "Kozhippara Falls is a few minutes down the hill and Thusharagiri about an hour away. We can arrange a jeep and a guide." },
-  { time: "6:00 pm", title: "Sunset", text: "The best seat is the end of the sky deck. The sun drops behind the far ridges and the mist comes back in." },
-  { time: "8:00 pm", title: "Dinner", text: "On the terrace when it is clear, in the dining hall when it rains." },
-  { time: "9:00 pm", title: "Campfire", text: "Firewood, fairy lights, and music if you want it. The lights along the stairways stay on until midnight." },
-];
+// The "above the mist" section between About and Stays. The three lines
+// crossfade as the morning cloud sinks into the valley below the resort.
+export const mist = {
+  beats: [
+    "Most mornings here begin inside a cloud.",
+    "By half past seven it sinks into the valley,",
+    "and We Land is left standing *above the mist.*",
+  ],
+  label: "We Land Resort",
+};
 
 export const dining = {
   title: "Cooked here, from close by.",

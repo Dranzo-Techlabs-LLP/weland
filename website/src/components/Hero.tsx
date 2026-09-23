@@ -31,7 +31,10 @@ export default function Hero() {
         </div>
       </div>
       <div className="hero-media">
-        <Photo src={images.hero.src} alt={images.hero.alt} priority />
+        {/* Taller than the frame; ScrollMotion drifts it for depth as the page scrolls */}
+        <div className="hero-media-inner" data-hero-parallax>
+          <Photo src={images.hero.src} alt={images.hero.alt} priority />
+        </div>
       </div>
     </section>
   );

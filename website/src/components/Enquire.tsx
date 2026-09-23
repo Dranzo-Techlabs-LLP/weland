@@ -17,18 +17,22 @@ export default function Enquire() {
           </p>
           <ul className="contact-list">
             <li>
-              <Phone size={18} aria-hidden="true" />
-              <a href={site.phoneHref}>{site.phone}</a>
-            </li>
-            <li>
-              <MessageCircle size={18} aria-hidden="true" />
-              <a href={`https://wa.me/${site.whatsapp}`} target="_blank" rel="noreferrer">
-                Message us on WhatsApp
+              <a className="contact-link" href={site.phoneHref}>
+                <Phone size={18} aria-hidden="true" />
+                <span>{site.phone}</span>
               </a>
             </li>
             <li>
-              <Mail size={18} aria-hidden="true" />
-              <a href={`mailto:${site.email}`}>{site.email}</a>
+              <a className="contact-link" href={`https://wa.me/${site.whatsapp}`} target="_blank" rel="noreferrer">
+                <MessageCircle size={18} aria-hidden="true" />
+                <span>Message us on WhatsApp</span>
+              </a>
+            </li>
+            <li>
+              <a className="contact-link" href={`mailto:${site.email}`}>
+                <Mail size={18} aria-hidden="true" />
+                <span>{site.email}</span>
+              </a>
             </li>
           </ul>
         </div>
