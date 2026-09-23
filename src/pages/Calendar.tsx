@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useStore } from '../data/store'
-import { ROOMS, ROOM_NAMES, roomColor } from '../lib/config'
+import { bookingHasRoom, FULL_PROPERTY, ROOMS, ROOM_OPTIONS, roomColor } from '../lib/config'
 import { monthLabel, parseISO, TODAY } from '../lib/format'
 import { secondaryBtnCls, selectCls } from '../components/styles'
 
@@ -28,7 +28,7 @@ export function Calendar() {
   const month = cursor.getMonth()
 
   const bookings = useMemo(
-    () => data.bookings.filter((b) => (villa === 'All rooms' || b.villa === villa) && b.status !== 'cancelled'),
+    () => data.bookings.filter((b) => (villa === 'All rooms' || bookingHasRoom(b.villa, villa)) && b.status !== 'cancelled'),
     [data.bookings, villa],
   )
 
@@ -86,7 +86,7 @@ export function Calendar() {
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <select value={villa} onChange={(e) => setVilla(e.target.value)} className={selectCls}>
           <option>All rooms</option>
-          {ROOM_NAMES.map((v) => (<option key={v}>{v}</option>))}
+          {ROOM_OPTIONS.map((v) => (<option key={v}>{v}</option>))}
         </select>
         <div className="ml-auto flex items-center gap-2">
           <button onClick={() => setCursor(new Date(TODAY.getFullYear(), TODAY.getMonth(), 1))} className={secondaryBtnCls}>Today</button>
@@ -149,6 +149,10 @@ export function Calendar() {
             <span className="inline-block h-2.5 w-4 rounded-sm" style={{ backgroundColor: r.color }} />{r.name}
           </span>
         ))}
+        <span className="inline-flex items-center gap-1.5">
+          <span className="inline-block h-2.5 w-4 rounded-sm" style={{ backgroundColor: roomColor(FULL_PROPERTY) }} />{FULL_PROPERTY}
+        </span>
+        <span className="text-slate-400">· multi-room bookings use their first room's color</span>
       </div>
     </>
   )

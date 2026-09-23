@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { CheckCircle2, Download, Eye, FileText, X } from 'lucide-react'
 import { B2B_CATEGORY, paidOf, useStore } from '../data/store'
-import { ROOM_NAMES } from '../lib/config'
+import { bookingHasRoom, ROOM_OPTIONS } from '../lib/config'
 import { formatINR, TODAY, TODAY_ISO, toISO } from '../lib/format'
 import { BOOKING_STATUSES } from '../lib/permissions'
 import { inputCls, primaryBtnCls, secondaryBtnCls, selectCls } from '../components/styles'
@@ -12,7 +12,7 @@ interface Report { columns: string[]; rows: (string | number)[][]; money: number
 
 function build(type: ReportType, data: AppData, from: string, to: string, villa: string, basis: 'stay' | 'cash'): Report {
   const inRange = (d: string) => (!from || d >= from) && (!to || d <= to)
-  const villaOk = (v: string) => villa === 'All rooms' || v === villa
+  const villaOk = (v: string) => villa === 'All rooms' || bookingHasRoom(v, villa)
 
   if (type === 'bookings') {
     const rows = data.bookings
@@ -152,7 +152,8 @@ export function Reports() {
         const kind = filterKind(col, i, report.money)
         const f = filters[i] ?? ''
         if (kind === 'none') return true
-        if (kind === 'room' || kind === 'status') return !f || f === 'All' || String(row[i]) === f
+        if (kind === 'room') return !f || f === 'All' || bookingHasRoom(String(row[i]), f)
+        if (kind === 'status') return !f || f === 'All' || String(row[i]) === f
         return matchText(String(row[i]), f)
       }),
     )
@@ -179,7 +180,7 @@ export function Reports() {
         <div className="flex flex-wrap items-end gap-4">
           <label className="block"><span className="mb-1 block text-xs font-medium text-slate-500">From</span><input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className={inputCls} /></label>
           <label className="block"><span className="mb-1 block text-xs font-medium text-slate-500">To</span><input type="date" value={to} onChange={(e) => setTo(e.target.value)} className={inputCls} /></label>
-          <label className="block"><span className="mb-1 block text-xs font-medium text-slate-500">Room</span><select value={villa} onChange={(e) => setVilla(e.target.value)} className={selectCls}><option>All rooms</option>{ROOM_NAMES.map((v) => (<option key={v}>{v}</option>))}</select></label>
+          <label className="block"><span className="mb-1 block text-xs font-medium text-slate-500">Room</span><select value={villa} onChange={(e) => setVilla(e.target.value)} className={selectCls}><option>All rooms</option>{ROOM_OPTIONS.map((v) => (<option key={v}>{v}</option>))}</select></label>
           <div>
             <span className="mb-1 block text-xs font-medium text-slate-500">Period basis</span>
             <div className="inline-flex rounded-lg border border-slate-200 p-0.5">
@@ -238,7 +239,7 @@ export function Reports() {
                         <th key={c} className="px-2 py-1.5 align-top">
                           {kind === 'room' && (
                             <select value={val || 'All'} onChange={(e) => set(e.target.value)} className={filterSelectCls}>
-                              <option>All</option>{ROOM_NAMES.map((v) => (<option key={v}>{v}</option>))}
+                              <option>All</option>{ROOM_OPTIONS.map((v) => (<option key={v}>{v}</option>))}
                             </select>
                           )}
                           {kind === 'status' && (

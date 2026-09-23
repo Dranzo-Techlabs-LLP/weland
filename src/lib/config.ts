@@ -11,6 +11,9 @@ export const INVOICE_PREFIX_DEFAULT = 'KV-'
 /** Sentinel used by every "All rooms" filter. */
 export const ALL_ROOMS = 'All rooms'
 
+/** Special room value: books the entire property (all rooms at once). */
+export const FULL_PROPERTY = 'Full Property'
+
 export interface RoomConfig {
   id: string
   name: string
@@ -35,11 +38,38 @@ export const ROOMS: RoomConfig[] = [
 
 export const ROOM_NAMES: string[] = ROOMS.map((r) => r.name)
 
+/** Options for room dropdowns (filters, expense room): every room plus Full Property. */
+export const ROOM_OPTIONS: string[] = [...ROOM_NAMES, FULL_PROPERTY]
+
 const BY_NAME = new Map(ROOMS.map((r) => [r.name, r]))
+
+/** Color for a single room, a comma list (uses the first room), or FULL_PROPERTY. */
 export function roomColor(name: string): string {
-  return BY_NAME.get(name)?.color ?? '#64748b'
+  if (name === FULL_PROPERTY) return '#7c2d12'
+  const first = name.includes(',') ? name.split(',')[0].trim() : name
+  return BY_NAME.get(first)?.color ?? '#64748b'
 }
 export function roomCapacity(name: string): { min: number; max: number } {
   const r = BY_NAME.get(name)
   return { min: r?.minGuests ?? 1, max: r?.maxGuests ?? 20 }
+}
+
+// ---- Multi-room helpers ---------------------------------------------------
+// A booking's `villa` field holds one room ("A1"), a comma list ("A1, B1"),
+// or the sentinel FULL_PROPERTY (the whole property).
+export function bookingRooms(villa: string): string[] {
+  if (!villa) return []
+  if (villa === FULL_PROPERTY) return ROOM_NAMES.slice()
+  return villa.split(',').map((s) => s.trim()).filter(Boolean)
+}
+export function isFullProperty(villa: string): boolean {
+  return villa === FULL_PROPERTY
+}
+export function bookingHasRoom(villa: string, room: string): boolean {
+  return villa === FULL_PROPERTY || bookingRooms(villa).includes(room)
+}
+/** Single bucket for calendar color / per-room accounting: first room, or FULL_PROPERTY. */
+export function primaryRoom(villa: string): string {
+  if (villa === FULL_PROPERTY) return FULL_PROPERTY
+  return bookingRooms(villa)[0] ?? villa
 }

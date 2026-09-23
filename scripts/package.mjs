@@ -43,7 +43,7 @@ const forbidden = entries.filter((e) => FORBIDDEN.some((re) => re.test(e.rel)))
 if (forbidden.length) {
   fail(`Refusing to package. These must never be deployed:\n  ${forbidden.map((e) => e.rel).join('\n  ')}\nRebuild with \`npm run build:all\`.`)
 }
-for (const required of ['index.html', '.htaccess', 'admin/index.html', 'admin/.htaccess', 'api/index.php', 'api/.htaccess']) {
+for (const required of ['index.html', '.htaccess', 'admin/index.html', 'admin/.htaccess', 'api/index.php', 'api/lib.php', 'api/.htaccess']) {
   if (!entries.some((e) => e.rel === required)) fail(`dist/ has no ${required}. Rebuild with \`npm run build:all\`.`)
 }
 

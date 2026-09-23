@@ -2,7 +2,7 @@
 //  Weland API client
 //  Talks to the PHP backend under /api (same origin in production).
 //  For local `npm run dev` against the live server, set
-//  VITE_API_BASE=https://welandresort.com/api in a .env.local file.
+//  VITE_API_BASE=https://welandresort.com/api in a .env.development.local file.
 // ------------------------------------------------------------------
 import type { AppData, Booking, BookingStatus, Expense, InvoiceSettings, Payment, Role, User } from '../types'
 
@@ -17,6 +17,13 @@ export interface SessionUser {
   role: string
   villa?: string
   rights: string[]
+}
+
+/** Fields the New/Edit booking forms send. */
+export type BookingWrite = Omit<Booking, 'id' | 'ref' | 'payments' | 'createdAt'> & {
+  advance?: number
+  advanceMethod?: string
+  b2bCommission?: number
 }
 
 export function getToken(): string | null {
@@ -74,16 +81,20 @@ export const api = {
   logout: () => req<{ ok: boolean }>('/logout', { method: 'POST' }),
   bootstrap: () => req<AppData>('/bootstrap'),
 
-  createBooking: (input: Omit<Booking, 'id' | 'ref' | 'payments' | 'createdAt'> & { advance?: number }) =>
+  createBooking: (input: BookingWrite) =>
     req<{ ref: string; booking: Booking }>('/bookings', { method: 'POST', body: input }),
-  updateBooking: (ref: string, fields: Omit<Booking, 'id' | 'ref' | 'payments' | 'createdAt'>) =>
+  updateBooking: (ref: string, fields: BookingWrite) =>
     req<{ booking: Booking }>(`/bookings/${encodeURIComponent(ref)}`, { method: 'PUT', body: fields }),
   deleteBooking: (ref: string) =>
     req<{ ok: boolean }>(`/bookings/${encodeURIComponent(ref)}`, { method: 'DELETE' }),
   setBookingStatus: (ref: string, status: BookingStatus) =>
     req<{ booking: Booking }>(`/bookings/${encodeURIComponent(ref)}`, { method: 'PATCH', body: { status } }),
-  addPayment: (ref: string, amount: number, kind: Payment['kind'], date: string) =>
-    req<{ booking: Booking }>(`/bookings/${encodeURIComponent(ref)}/payments`, { method: 'POST', body: { amount, kind, date } }),
+  addPayment: (ref: string, p: Omit<Payment, 'id'>) =>
+    req<{ booking: Booking }>(`/bookings/${encodeURIComponent(ref)}/payments`, { method: 'POST', body: p }),
+  updatePayment: (id: string, p: Omit<Payment, 'id'>) =>
+    req<{ booking: Booking }>(`/payments/${encodeURIComponent(id)}`, { method: 'PUT', body: p }),
+  deletePayment: (id: string) =>
+    req<{ booking: Booking }>(`/payments/${encodeURIComponent(id)}`, { method: 'DELETE' }),
 
   addExpense: (e: Omit<Expense, 'id'>) =>
     req<{ expense: Expense }>('/expenses', { method: 'POST', body: e }),

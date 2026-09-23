@@ -4,7 +4,13 @@
 //  All /api/* requests land here (see .htaccess).
 // ------------------------------------------------------------------
 declare(strict_types=1);
-require __DIR__ . '/config.php';
+
+namespace Weland;
+
+use Throwable;
+
+require __DIR__ . '/config.php';   // settings — stays on the server
+require __DIR__ . '/lib.php';      // helpers — ships with every release
 cors();
 
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
@@ -135,17 +141,20 @@ try {
     $ref = $inv['prefix'] . str_pad((string)$inv['next'], (int)$inv['padding'], '0', STR_PAD_LEFT);
     $pdo->prepare('UPDATE invoice_settings SET next = next + 1 WHERE id = 1')->execute();
     $id = gen_id('b');
-    $pdo->prepare('INSERT INTO bookings (id, ref, guest, phone, email, villa, check_in, check_out, guests, status, total, source, created_at)
-                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,CURDATE())')
+    $adults = (int)($b['adults'] ?? 0);
+    $kids   = (int)($b['kids'] ?? 0);
+    $guests = max(1, $adults + $kids);
+    $pdo->prepare('INSERT INTO bookings (id, ref, guest, phone, alt_phone, email, villa, check_in, check_out, guests, adults, kids, status, total, source, notes, created_at)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,CURDATE())')
         ->execute([
-          $id, $ref, $b['guest'] ?? '', $b['phone'] ?? '', ($b['email'] ?? '') ?: null, $b['villa'] ?? '',
-          $b['checkIn'] ?? null, $b['checkOut'] ?? null, (int)($b['guests'] ?? 1),
-          $b['status'] ?? 'confirmed', (int)round((float)($b['total'] ?? 0)), $b['source'] ?? 'Direct',
+          $id, $ref, $b['guest'] ?? '', $b['phone'] ?? '', ($b['altPhone'] ?? '') ?: null, ($b['email'] ?? '') ?: null, $b['villa'] ?? '',
+          $b['checkIn'] ?? null, $b['checkOut'] ?? null, $guests, $adults, $kids,
+          $b['status'] ?? 'confirmed', (int)round((float)($b['total'] ?? 0)), $b['source'] ?? 'Direct', ($b['notes'] ?? '') ?: null,
         ]);
     if (!empty($b['advance'])) {
-      $pdo->prepare('INSERT INTO payments (id, booking_ref, date, amount, kind) VALUES (?,?,CURDATE(),?,\'payment\')')
-          ->execute([gen_id('p'), $ref, (int)round((float)$b['advance'])]);
+      sync_advance($ref, (int)round((float)$b['advance']), $b['advanceMethod'] ?? 'Cash');
     }
+    sync_b2b_expense($ref, $b['villa'] ?? '', (int)round((float)($b['b2bCommission'] ?? 0)));
     $pdo->commit();
     json_out(['ref' => $ref, 'booking' => get_booking($ref)], 201);
   }
@@ -169,12 +178,26 @@ try {
     $exists->execute([$ref]);
     if (!$exists->fetch()) fail('Booking not found.', 404);
     if (($b['status'] ?? '') === 'cancelled') require_right($me, 'cancel_bookings');
-    db()->prepare('UPDATE bookings SET guest=?, phone=?, email=?, villa=?, check_in=?, check_out=?, guests=?, status=?, total=?, source=? WHERE ref=?')
+    $pdo = db();
+    $pdo->beginTransaction();
+    $adults = (int)($b['adults'] ?? 0);
+    $kids   = (int)($b['kids'] ?? 0);
+    $guests = max(1, $adults + $kids);
+    $pdo->prepare('UPDATE bookings SET guest=?, phone=?, alt_phone=?, email=?, villa=?, check_in=?, check_out=?, guests=?, adults=?, kids=?, status=?, total=?, source=?, notes=? WHERE ref=?')
         ->execute([
-          $b['guest'] ?? '', $b['phone'] ?? '', ($b['email'] ?? '') ?: null, $b['villa'] ?? '',
-          $b['checkIn'] ?? null, $b['checkOut'] ?? null, (int)($b['guests'] ?? 1),
-          $b['status'] ?? 'confirmed', (int)round((float)($b['total'] ?? 0)), $b['source'] ?? 'Direct', $ref,
+          $b['guest'] ?? '', $b['phone'] ?? '', ($b['altPhone'] ?? '') ?: null, ($b['email'] ?? '') ?: null, $b['villa'] ?? '',
+          $b['checkIn'] ?? null, $b['checkOut'] ?? null, $guests, $adults, $kids,
+          $b['status'] ?? 'confirmed', (int)round((float)($b['total'] ?? 0)), $b['source'] ?? 'Direct', ($b['notes'] ?? '') ?: null, $ref,
         ]);
+    // The advance entered while booking: create / update / remove that one payment
+    if (array_key_exists('advance', $b)) {
+      sync_advance($ref, (int)round((float)($b['advance'] ?? 0)), $b['advanceMethod'] ?? 'Cash');
+    }
+    // Keep the linked B2B expense in sync with the commission field
+    if (array_key_exists('b2bCommission', $b)) {
+      sync_b2b_expense($ref, $b['villa'] ?? '', (int)round((float)$b['b2bCommission']));
+    }
+    $pdo->commit();
     json_out(['booking' => get_booking($ref)]);
   }
 
@@ -195,9 +218,30 @@ try {
     $ref = $seg[1];
     $b = body();
     $kind = ($b['kind'] ?? 'payment') === 'refund' ? 'refund' : 'payment';
-    db()->prepare('INSERT INTO payments (id, booking_ref, date, amount, kind) VALUES (?,?,?,?,?)')
-        ->execute([gen_id('p'), $ref, $b['date'] ?? date('Y-m-d'), (int)round((float)($b['amount'] ?? 0)), $kind]);
+    db()->prepare('INSERT INTO payments (id, booking_ref, date, amount, kind, method, reference, is_advance) VALUES (?,?,?,?,?,?,?,?)')
+        ->execute([gen_id('p'), $ref, $b['date'] ?? date('Y-m-d'), (int)round((float)($b['amount'] ?? 0)), $kind,
+                   ($b['method'] ?? '') ?: null, ($b['reference'] ?? '') ?: null, (!empty($b['advance']) && $kind === 'payment') ? 1 : 0]);
     json_out(['booking' => get_booking($ref)], 201);
+  }
+
+  // ---------- Payments: edit / delete a single ledger line ----------
+  if (($method === 'PUT' || $method === 'DELETE') && count($seg) === 2 && $seg[0] === 'payments') {
+    require_right($me, 'record_payments');
+    $st = db()->prepare('SELECT booking_ref FROM payments WHERE id = ?');
+    $st->execute([$seg[1]]);
+    $row = $st->fetch();
+    if (!$row) fail('Payment not found.', 404);
+    if ($method === 'DELETE') {
+      db()->prepare('DELETE FROM payments WHERE id = ?')->execute([$seg[1]]);
+    } else {
+      $b = body();
+      $kind = ($b['kind'] ?? 'payment') === 'refund' ? 'refund' : 'payment';
+      db()->prepare('UPDATE payments SET date = ?, amount = ?, kind = ?, method = ?, reference = ?, is_advance = ? WHERE id = ?')
+          ->execute([$b['date'] ?? date('Y-m-d'), (int)round((float)($b['amount'] ?? 0)), $kind,
+                     ($b['method'] ?? '') ?: null, ($b['reference'] ?? '') ?: null,
+                     (!empty($b['advance']) && $kind === 'payment') ? 1 : 0, $seg[1]]);
+    }
+    json_out(['booking' => get_booking($row['booking_ref'])]);
   }
 
   // ---------- Expenses ----------

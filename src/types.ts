@@ -15,6 +15,9 @@ export interface Payment {
   date: string // ISO
   amount: number
   kind: 'payment' | 'refund'
+  method?: string // Cash, UPI, Card, Bank transfer…
+  reference?: string // UPI / transaction / cheque ref (optional)
+  advance?: boolean // the advance entered while booking (one per booking)
 }
 
 export interface Booking {
@@ -22,15 +25,19 @@ export interface Booking {
   ref: string // WL-0001
   guest: string
   phone: string
+  altPhone?: string // alternate mobile (optional)
   email?: string
-  villa: string // villa name
+  villa: string // one room ("A1"), a comma list ("A1, B1"), or "Full Property"
   checkIn: string // ISO date
   checkOut: string // ISO date
-  guests: number
+  guests: number // total = adults + kids
+  adults?: number
+  kids?: number
   status: BookingStatus
   total: number
   payments: Payment[]
   source: string // Direct, B2B, OTA…
+  notes?: string
   createdAt: string
 }
 
