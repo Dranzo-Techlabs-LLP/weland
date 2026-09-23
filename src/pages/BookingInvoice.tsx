@@ -63,13 +63,14 @@ export function BookingInvoice() {
             <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Billed to</div>
             <div className="mt-1.5 font-medium text-slate-900">{booking.guest}</div>
             {booking.phone && <div className="nums text-sm text-slate-600">{booking.phone}</div>}
+            {booking.altPhone && <div className="nums text-sm text-slate-600">{booking.altPhone}</div>}
             {booking.email && <div className="text-sm text-slate-600">{booking.email}</div>}
           </div>
           <div className="sm:text-right">
             <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Stay</div>
-            <div className="mt-1.5 text-sm text-slate-700">Room <span className="font-medium text-slate-900">{booking.villa}</span></div>
+            <div className="mt-1.5 text-sm text-slate-700">Rooms <span className="font-medium text-slate-900">{booking.villa}</span></div>
             <div className="nums text-sm text-slate-600">{fmtDate(booking.checkIn)} → {fmtDate(booking.checkOut)}</div>
-            <div className="nums text-sm text-slate-600">{nightCount} night{nightCount > 1 ? 's' : ''} · {booking.guests} guest{booking.guests > 1 ? 's' : ''}</div>
+            <div className="nums text-sm text-slate-600">{nightCount} night{nightCount > 1 ? 's' : ''} · {booking.adults ?? booking.guests} adults, {booking.kids ?? 0} kids</div>
           </div>
         </div>
 

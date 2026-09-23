@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { Plus, Search } from 'lucide-react'
 import { can, useAuth } from '../auth/AuthContext'
 import { balanceOf, paidOf, useStore } from '../data/store'
-import { ROOM_NAMES } from '../lib/config'
+import { bookingHasRoom, ROOM_OPTIONS } from '../lib/config'
 import { fmtDate, formatINR, parseISO } from '../lib/format'
 import { BOOKING_STATUSES } from '../lib/permissions'
 import { StatusPill } from '../components/ui/StatusPill'
@@ -28,9 +28,9 @@ export function Bookings() {
     return data.bookings
       .map((b) => ({ ...b, paid: paidOf(b), balance: balanceOf(b) }))
       .filter((b) => {
-        if (villa !== 'All rooms' && b.villa !== villa) return false
+        if (villa !== 'All rooms' && !bookingHasRoom(b.villa, villa)) return false
         if (status !== 'All status' && b.status !== status) return false
-        if (query && !`${b.guest} ${b.phone} ${b.ref}`.toLowerCase().includes(query)) return false
+        if (query && !`${b.guest} ${b.phone} ${b.altPhone ?? ''} ${b.ref}`.toLowerCase().includes(query)) return false
         return true
       })
       .sort((a, b) => (a.checkIn < b.checkIn ? 1 : -1))
@@ -55,7 +55,7 @@ export function Bookings() {
         </div>
         <select value={villa} onChange={(e) => setVilla(e.target.value)} className={`${selectCls} h-10`}>
           <option>All rooms</option>
-          {ROOM_NAMES.map((v) => (<option key={v}>{v}</option>))}
+          {ROOM_OPTIONS.map((v) => (<option key={v}>{v}</option>))}
         </select>
         <select value={status} onChange={(e) => setStatus(e.target.value)} className={`${selectCls} h-10`}>
           <option>All status</option>

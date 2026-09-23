@@ -54,6 +54,8 @@ export const CATEGORY_PILL: Record<string, string> = {
   Misc: 'bg-slate-100 text-slate-600',
 }
 
+export const PAYMENT_METHODS = ['Cash', 'UPI', 'Card', 'Bank transfer']
+
 export const BOOKING_STATUSES = [
   'enquiry', 'hold', 'confirmed', 'checked in', 'completed', 'cancelled',
 ] as const

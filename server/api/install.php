@@ -17,7 +17,11 @@
 //  non-destructive (creates only what is missing, keeps existing rows).
 // ------------------------------------------------------------------
 declare(strict_types=1);
+
+namespace Weland;
+
 require __DIR__ . '/config.php';
+require __DIR__ . '/lib.php';
 
 $isCli = (php_sapi_name() === 'cli');
 if (!$isCli) {
@@ -69,16 +73,20 @@ $pdo->exec("CREATE TABLE IF NOT EXISTS bookings (
   ref VARCHAR(40) NOT NULL UNIQUE,
   guest VARCHAR(160) NOT NULL,
   phone VARCHAR(40) NOT NULL DEFAULT '',
+  alt_phone VARCHAR(40) NULL,
   email VARCHAR(190) NULL,
-  villa VARCHAR(60) NOT NULL,
+  villa VARCHAR(255) NOT NULL,
   check_in DATE NOT NULL,
   check_out DATE NOT NULL,
   guests INT NOT NULL DEFAULT 1,
+  adults INT NOT NULL DEFAULT 0,
+  kids INT NOT NULL DEFAULT 0,
   status VARCHAR(20) NOT NULL,
   total INT NOT NULL DEFAULT 0,
   source VARCHAR(30) NOT NULL DEFAULT 'Direct',
+  notes TEXT NULL,
   created_at DATE NOT NULL,
-  INDEX (check_in), INDEX (villa), INDEX (status)
+  INDEX (check_in), INDEX (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
 $pdo->exec("CREATE TABLE IF NOT EXISTS payments (
@@ -87,6 +95,9 @@ $pdo->exec("CREATE TABLE IF NOT EXISTS payments (
   date DATE NOT NULL,
   amount INT NOT NULL,
   kind VARCHAR(10) NOT NULL DEFAULT 'payment',
+  method VARCHAR(20) NULL,
+  reference VARCHAR(100) NULL,
+  is_advance TINYINT(1) NOT NULL DEFAULT 0,
   INDEX (booking_ref)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 

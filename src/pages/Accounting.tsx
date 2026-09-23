@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { B2B_CATEGORY, useStore } from '../data/store'
-import { ROOM_NAMES } from '../lib/config'
+import { FULL_PROPERTY, isFullProperty, primaryRoom, ROOM_NAMES, ROOM_OPTIONS } from '../lib/config'
 import { formatINR, TODAY, TODAY_ISO, toISO } from '../lib/format'
 import { inputCls, selectCls, thCls, thRightCls } from '../components/styles'
 import { VillaDot } from '../components/ui/VillaDot'
@@ -24,15 +24,16 @@ export function Accounting() {
 
   const model = useMemo(() => {
     const inRange = (d: string) => (!from || d >= from) && (!to || d <= to)
-    const villaList = villa === 'All rooms' ? ROOM_NAMES : [villa]
+    const hasFull = data.bookings.some((b) => isFullProperty(b.villa)) || data.expenses.some((e) => isFullProperty(e.villa))
+    const villaList = villa === 'All rooms' ? (hasFull ? [...ROOM_NAMES, FULL_PROPERTY] : ROOM_NAMES) : [villa]
     const inScope = (v: string) => villa === 'All rooms' || v === villa
 
     const perVilla = villaList.map((v) => {
-      const bk = data.bookings.filter((b) => b.villa === v)
+      const bk = data.bookings.filter((b) => primaryRoom(b.villa) === v)
       const collected = bk.reduce((s, b) => s + b.payments.filter((p) => p.kind === 'payment' && inRange(p.date)).reduce((ps, p) => ps + p.amount, 0), 0)
       const refunded = bk.reduce((s, b) => s + b.payments.filter((p) => p.kind === 'refund' && inRange(p.date)).reduce((ps, p) => ps + p.amount, 0), 0)
-      const b2b = data.expenses.filter((e) => e.villa === v && e.category === B2B_CATEGORY && inRange(e.date)).reduce((s, e) => s + e.amount, 0)
-      const operating = data.expenses.filter((e) => e.villa === v && e.category !== B2B_CATEGORY && inRange(e.date)).reduce((s, e) => s + e.amount, 0)
+      const b2b = data.expenses.filter((e) => primaryRoom(e.villa) === v && e.category === B2B_CATEGORY && inRange(e.date)).reduce((s, e) => s + e.amount, 0)
+      const operating = data.expenses.filter((e) => primaryRoom(e.villa) === v && e.category !== B2B_CATEGORY && inRange(e.date)).reduce((s, e) => s + e.amount, 0)
       const bookings = bk.filter((b) => b.status !== 'cancelled' && inRange(b.checkIn)).length
       const revenue = collected - refunded - b2b
       return { villa: v, collected, refunded, b2b, operating, bookings, revenue, profit: revenue - operating }
@@ -45,7 +46,7 @@ export function Accounting() {
     const operating = sum((r) => r.operating)
     const netRevenue = collected - refunded - b2b
     const profit = netRevenue - operating
-    const contracted = data.bookings.filter((b) => inScope(b.villa) && b.status !== 'cancelled' && inRange(b.checkIn)).reduce((s, b) => s + b.total, 0)
+    const contracted = data.bookings.filter((b) => inScope(primaryRoom(b.villa)) && b.status !== 'cancelled' && inRange(b.checkIn)).reduce((s, b) => s + b.total, 0)
     const outstanding = contracted - netRevenue
     return { perVilla, collected, refunded, b2b, operating, netRevenue, profit, contracted, outstanding }
   }, [data, villa, from, to])
@@ -59,7 +60,7 @@ export function Accounting() {
       <div className="mb-4 flex flex-wrap items-end gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
         <label className="block"><span className="mb-1 block text-xs font-medium text-slate-500">From</span><input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className={inputCls} /></label>
         <label className="block"><span className="mb-1 block text-xs font-medium text-slate-500">To</span><input type="date" value={to} onChange={(e) => setTo(e.target.value)} className={inputCls} /></label>
-        <label className="block"><span className="mb-1 block text-xs font-medium text-slate-500">Room</span><select value={villa} onChange={(e) => setVilla(e.target.value)} className={selectCls}><option>All rooms</option>{ROOM_NAMES.map((v) => (<option key={v}>{v}</option>))}</select></label>
+        <label className="block"><span className="mb-1 block text-xs font-medium text-slate-500">Room</span><select value={villa} onChange={(e) => setVilla(e.target.value)} className={selectCls}><option>All rooms</option>{ROOM_OPTIONS.map((v) => (<option key={v}>{v}</option>))}</select></label>
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">

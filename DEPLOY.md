@@ -51,15 +51,15 @@ Before: `public_html` holds the old admin build at its root
 4. **Extract.** Right-click the zip → **Extract** → into `/public_html` →
    **Extract File(s)** → **Reload**. You should now see `admin`, `api`,
    `images`, `_next`, `index.html`, `404.html`, `robots.txt` and `.htaccess`.
-   In `api/`, `index.php` and `.htaccess` were updated; `config.php` was left
-   exactly as it was.
+   In `api/`, `index.php`, `lib.php` and `.htaccess` were updated; `config.php`
+   was left exactly as it was.
 
 5. **Delete the uploaded zip** from `public_html` (otherwise anyone could
    download it).
 
 6. **Tidy `api/`.** If `api/install.php` is still there, delete it: it's the
    one-time installer, and it can drop every table. `api/config.example.php`
-   can go too. Keep `config.php`, `index.php` and `.htaccess`.
+   can go too. Keep `config.php`, `index.php`, `lib.php` and `.htaccess`.
 
 7. **Turn on enquiry emails.**
    - Open `api/config.php` → **Edit**. Below the line that starts with
@@ -101,6 +101,9 @@ home folder) into `/public_html`. That restores the old `index.html`,
 ## Later deploys
 
 Run `npm run release`, upload the new zip to `public_html`, **Extract** it
-(overwriting), and delete the zip. Nothing else changes: `config.php` and the
-database stay as they are. To clear out old build files first, delete
-`_next` and `admin/assets` before extracting.
+(overwriting), and delete the zip. `config.php` stays as it is. To clear out
+old build files first, delete `_next` and `admin/assets` before extracting.
+
+If the release adds database columns, first run `weland-migrate.sql` in
+phpMyAdmin (`weland` → **SQL**). It only adds what's missing, so it's safe
+to run again.

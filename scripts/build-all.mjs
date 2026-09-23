@@ -17,9 +17,10 @@ const website = join(root, 'website')
 const dist = join(root, 'dist')
 
 // Only these API files are deployed. Deliberately a list, not a filter:
-//  - config.php holds the database password and lives only on the server;
+//  - config.php holds the database password and lives only on the server
+//    (settings only: the code it needs is in lib.php, which ships);
 //  - install.php is a one-time setup script that can wipe the database.
-const API_FILES = ['index.php', '.htaccess']
+const API_FILES = ['index.php', 'lib.php', '.htaccess']
 
 function run(cmd, cwd = root) {
   console.log(`\n> ${cmd}${cwd === root ? '' : `   (in ${relative(root, cwd)}/)`}`)
