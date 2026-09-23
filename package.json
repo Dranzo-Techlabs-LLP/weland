@@ -9,6 +9,8 @@
     "build": "tsc -b && vite build",
     "build:site": "npm --prefix website run build",
     "build:all": "node scripts/build-all.mjs",
+    "package": "node scripts/package.mjs",
+    "release": "npm run build:all && npm run package",
     "preview": "vite preview",
     "preview:all": "php -S localhost:8080 -t dist scripts/serve-dist.php",
     "lint": "tsc --noEmit",

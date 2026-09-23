@@ -1,20 +1,25 @@
 // Builds the website and the admin app and assembles dist/, a folder laid out
 // exactly like public_html on the server:
 //
-//   dist/            website (static export of website/)       → served at /
-//   dist/admin/      admin app (vite build, base /admin/)       → served at /admin
-//   dist/api/        PHP API from server/api, minus config.php  → served at /api
+//   dist/            website (static export of website/)   → served at /
+//   dist/admin/      admin app (vite build, base /admin/)   → served at /admin
+//   dist/api/        the PHP API's runtime files            → served at /api
 //   dist/.htaccess   from deploy/.htaccess
 //
-// Usage: npm run build:all
+// Usage: npm run build:all   (npm run release also zips it for upload)
 import { execSync } from 'node:child_process'
-import { copyFileSync, cpSync, existsSync, rmSync } from 'node:fs'
+import { copyFileSync, cpSync, existsSync, mkdirSync, rmSync } from 'node:fs'
 import { dirname, join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const website = join(root, 'website')
 const dist = join(root, 'dist')
+
+// Only these API files are deployed. Deliberately a list, not a filter:
+//  - config.php holds the database password and lives only on the server;
+//  - install.php is a one-time setup script that can wipe the database.
+const API_FILES = ['index.php', '.htaccess']
 
 function run(cmd, cwd = root) {
   console.log(`\n> ${cmd}${cwd === root ? '' : `   (in ${relative(root, cwd)}/)`}`)
@@ -32,13 +37,13 @@ cpSync(join(website, 'out'), dist, { recursive: true })
 if (!existsSync(join(root, 'node_modules'))) run('npm ci')
 run('npm run build')
 
-// 3. API → dist/api. config.php holds the DB password and stays on the server.
-cpSync(join(root, 'server', 'api'), join(dist, 'api'), {
-  recursive: true,
-  filter: (src) => !/[\/]config\.php$/.test(src),
-})
+// 3. API → dist/api
+mkdirSync(join(dist, 'api'), { recursive: true })
+for (const file of API_FILES) {
+  copyFileSync(join(root, 'server', 'api', file), join(dist, 'api', file))
+}
 
 // 4. Root routing rules
 copyFileSync(join(root, 'deploy', '.htaccess'), join(dist, '.htaccess'))
 
-console.log('\nBuilt dist/ — upload its contents to public_html. See README → Deploying.')
+console.log('\nBuilt dist/. Run `npm run package` to zip it for cPanel (see DEPLOY.md).')

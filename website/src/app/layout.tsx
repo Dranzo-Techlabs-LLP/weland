@@ -22,7 +22,7 @@ const karla = Karla({
 
 export const metadata: Metadata = {
   // Makes the share-preview image an absolute URL on the live domain.
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://weland.dranzo.com"),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://welandresort.com"),
   title: `${site.name}, Kakkadampoyil — ${site.tagline}`,
   description: site.description,
   openGraph: {

@@ -15,6 +15,7 @@ import json
 import os
 import sys
 import urllib.error
+import urllib.parse
 import urllib.request
 from datetime import date, timedelta
 
@@ -44,17 +45,26 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
 opener = urllib.request.build_opener(NoRedirect)
 
 
-def http(path, method="GET", body=None):
+def http(path, method="GET", body=None, host=None):
     """Return (status, headers, text) without following redirects."""
     data = json.dumps(body).encode() if body is not None else None
     req = urllib.request.Request(BASE + path, data=data, method=method)
     if data is not None:
         req.add_header("Content-Type", "application/json")
+    if host:
+        req.add_header("Host", host)
     try:
         with opener.open(req) as r:
             return r.status, r.headers, r.read().decode("utf-8", "replace")
     except urllib.error.HTTPError as e:
         return e.code, e.headers, e.read().decode("utf-8", "replace")
+
+
+def location(h):
+    """Redirect target as a path; Apache sends absolute URLs, the PHP preview relative ones."""
+    loc = h.get("Location") or ""
+    u = urllib.parse.urlsplit(loc)
+    return u.path + (f"?{u.query}" if u.query else "")
 
 
 # ---------- URL map ----------
@@ -67,13 +77,27 @@ check("/admin/ serves the admin app", s == 200 and "Weland · Admin" in t and "/
 s, h, t = http("/admin/bookings/KV-00001")
 check("admin deep link falls back to the admin app", s == 200 and "Weland · Admin" in t, f"status={s}")
 s, h, t = http("/login")
-check("old /login bookmark -> /admin/login", s == 302 and h.get("Location") == "/admin/login", f"{s} -> {h.get('Location')}")
+check("old /login bookmark -> /admin/login", s == 302 and location(h) == "/admin/login", f"{s} -> {h.get('Location')}")
 s, h, t = http("/bookings/KV-00001")
-check("old deep admin link keeps its path", s == 302 and h.get("Location") == "/admin/bookings/KV-00001", f"{s} -> {h.get('Location')}")
+check("old deep admin link keeps its path", s == 302 and location(h) == "/admin/bookings/KV-00001", f"{s} -> {h.get('Location')}")
 s, h, t = http("/no-such-page")
 check("unknown page -> website 404", s == 404 and "could not be found" in t, f"status={s}")
 s, h, t = http("/api/config.php")
 check("API config is not downloadable", "DB_PASS" not in t, f"status={s}")
+s, h, t = http("/robots.txt")
+check("robots.txt keeps /admin out of search", s == 200 and "Disallow: /admin/" in t, f"status={s}")
+
+# ---------- production-only rules ----------
+s, h, t = http("/error_log")
+check("PHP error_log is not served", s == 403, f"status={s}")
+s, h, t = http("/api/error_log")
+check("API error_log is not served", s == 403, f"status={s}")
+s, h, t = http("/?utm=x", host="www.welandresort.com")
+check("www.welandresort.com -> welandresort.com", s == 301 and (h.get("Location") or "").startswith("http://welandresort.com/?utm=x"), f"{s} -> {h.get('Location')}")
+s, h, t = http("/admin/bookings", host="www.welandresort.com")
+check("www admin links -> welandresort.com/admin", s == 301 and (h.get("Location") or "") == "http://welandresort.com/admin/bookings", f"{s} -> {h.get('Location')}")
+s, h, t = http("/.well-known/acme-challenge/probe", host="www.welandresort.com")
+check("SSL checks on www are not redirected", s != 301, f"status={s}")
 
 # ---------- API ----------
 s, h, t = http("/api/me")

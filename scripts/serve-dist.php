@@ -30,6 +30,21 @@ function in_dist(string $dist, string $uri): ?string {
   return ($p !== false && str_starts_with($p, $dist)) ? $p : null;
 }
 
+// PHP log and ini files are never served (FilesMatch in deploy/.htaccess)
+if (in_array(basename($uri), ['error_log', '.user.ini', 'php.ini'], true)) {
+  http_response_code(403);
+  return true;
+}
+
+// www.welandresort.com -> welandresort.com for the website and the admin
+// (deploy/.htaccess, admin/.htaccess). Not for SSL checks, and not for /api:
+// a redirect would turn the form's POST into a GET.
+$host = strtolower((string)($_SERVER['HTTP_HOST'] ?? ''));
+if ($host === 'www.welandresort.com' && !str_starts_with($uri, '/.well-known/') && !preg_match('#^/api(/|$)#', $uri)) {
+  header('Location: http://welandresort.com' . ($_SERVER['REQUEST_URI'] ?? '/'), true, 301);
+  return true;
+}
+
 // PHP API
 if (preg_match('#^/api(/|$)#', $uri)) {
   chdir(__DIR__ . '/../server/api');

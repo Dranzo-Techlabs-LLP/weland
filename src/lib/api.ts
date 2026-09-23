@@ -2,7 +2,7 @@
 //  Weland API client
 //  Talks to the PHP backend under /api (same origin in production).
 //  For local `npm run dev` against the live server, set
-//  VITE_API_BASE=https://weland.dranzo.com/api in a .env.local file.
+//  VITE_API_BASE=https://welandresort.com/api in a .env.local file.
 // ------------------------------------------------------------------
 import type { AppData, Booking, BookingStatus, Expense, InvoiceSettings, Payment, Role, User } from '../types'
 

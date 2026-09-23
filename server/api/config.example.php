@@ -24,7 +24,7 @@ const INSTALL_KEY = '__SET_INSTALL_KEY__';
 //  error log, so nothing is lost).
 const ENQUIRY_TO_EMAIL = '';
 //  Sender address. Use a mailbox on this domain so the mail isn't marked spam.
-const ENQUIRY_FROM_EMAIL = 'enquiry@weland.dranzo.com';
+const ENQUIRY_FROM_EMAIL = 'enquiry@welandresort.com';
 //  Local development only: write enquiries to the error log instead of mailing.
 const ENQUIRY_LOG_ONLY = false;
 
@@ -33,7 +33,8 @@ const ENQUIRY_LOG_ONLY = false;
 //   CORS is not even needed there; the localhost entries are only for dev:
 //   5173 = admin `npm run dev`, 3050 = website `npm run dev:site`.)
 const ALLOWED_ORIGINS = [
-  'https://weland.dranzo.com',
+  'https://welandresort.com',
+  'https://www.welandresort.com',
   'http://localhost:5173',
   'http://localhost:5199',
   'http://localhost:3050',

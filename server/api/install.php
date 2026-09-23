@@ -8,7 +8,7 @@
 //  Run it EITHER way:
 //    - Terminal (WHM/SSH):  php install.php          (add `fresh` to wipe first)
 //                           php install.php fresh
-//    - Browser:             https://weland.dranzo.com/api/install.php?key=YOUR_INSTALL_KEY
+//    - Browser:             https://welandresort.com/api/install.php?key=YOUR_INSTALL_KEY
 //                           add &fresh=1 to wipe first
 //  Then DELETE this file.
 //

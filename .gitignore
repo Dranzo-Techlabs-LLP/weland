@@ -36,3 +36,6 @@ server/api/config.php
 
 # Local test output
 tests/screenshots
+
+# Deploy zips made by `npm run package`
+release/

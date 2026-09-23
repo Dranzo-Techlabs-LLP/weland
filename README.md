@@ -35,11 +35,12 @@ npm install --prefix website   # website
 | `npm run dev` | Admin at **http://localhost:5173/admin/** |
 | `npm run dev:site` | Website at **http://localhost:3050** |
 | `npm run build:all` | Builds both and assembles **`dist/`**, laid out exactly like `public_html` |
+| `npm run release` | `build:all`, then zips `dist/` for cPanel into `release/` |
 | `npm run preview:all` | Serves `dist/` at **http://localhost:8080** with the production routing (needs `php` on your PATH, e.g. XAMPP) |
 
 In dev, point either app at a running API with `VITE_API_BASE` (admin) or
 `NEXT_PUBLIC_API_BASE` (website) in a `.env.local` — for example the live one,
-`https://weland.dranzo.com/api`. `preview:all` uses the API in `server/api/`
+`https://welandresort.com/api`. `preview:all` uses the API in `server/api/`
 with your local `server/api/config.php`.
 
 Smoke tests (Playwright for Python; run `preview:all` first):
@@ -51,24 +52,15 @@ WELAND_URL=http://localhost:8080 python website/tests/test_site.py   # the websi
 
 ## Deploying (cPanel)
 
-1. Run `npm run build:all`.
-2. Upload **the contents of `dist/`** to `public_html`, including the hidden
-   `.htaccess` files, overwriting what is there. `dist/api/` never contains
-   `config.php`, so the server's copy (with the database password) is left alone.
-3. The first time only, delete the admin files left at the root by the old
-   layout: `public_html/assets/`, `favicon.png`, `weland-logo.png`, `weland.svg`.
-   They now live in `public_html/admin/`. **Do not delete `api/`.**
-4. The first time only, add the enquiry settings to `public_html/api/config.php`
-   (see `server/api/config.example.php`):
+`npm run release` builds everything and writes
+`release/welandresort-deploy-YYYYMMDD-HHMM.zip`: upload it to `public_html`,
+extract it, delete the zip. **[DEPLOY.md](DEPLOY.md)** has the full steps for
+welandresort.com, including the one-time switch from the old admin-only site,
+the enquiry email settings and a rollback.
 
-   ```php
-   const ENQUIRY_TO_EMAIL = 'reservations@example.com';     // who receives website enquiries
-   const ENQUIRY_FROM_EMAIL = 'enquiry@weland.dranzo.com';  // a mailbox on this domain
-   ```
-
-   and create the `ENQUIRY_FROM_EMAIL` mailbox in cPanel → Email Accounts so the
-   mail isn't marked as spam.
-5. Staff now sign in at **https://weland.dranzo.com/admin**.
+The zip never contains `api/config.php` (the database password, which stays
+on the server) or `api/install.php` (the one-time installer, which can wipe the
+database). Staff sign in at **https://welandresort.com/admin**.
 
 ### Enquiry email
 
