@@ -53,7 +53,7 @@ Everything editable is in `src/lib/content.ts`. Photos are pre-sized web copies
 
 | Source folder | Used for |
 |---------------|----------|
-| `GEN`  | hero (sky deck at sunset), above the mist (aerial), gallery (12 photos, incl. the deck table) |
+| `GEN`  | hero (sky deck at sunset), above the mist (aerial), gallery (12 photos, incl. the deck table and the building by day) |
 | `A1`–`A6` | "The Rooms" band and the room-by-room grid (one photo per room) |
 | `DOM`  | "The Dormitory" band (bunks, exterior, deck at dusk, washrooms) |
 | `HALL` | conference hall (wide shot, stage wall, carrom/seating, washrooms) |
@@ -67,6 +67,9 @@ dusk) was supplied separately.
 Contact details in `content.ts`: bookings and WhatsApp on +91 90744 24142,
 check-in 3:00 pm, check-out 12:00 noon, and the address, map and "Open in
 Google Maps" link from the resort's Google Maps listing.
+
+The "Getting here" distances are measured from the map pin and the times are
+estimates for the hill road: worth confirming with the resort.
 
 Still marked **PLACEHOLDER** in `content.ts`: email, all rates, the dormitory bed count,
 the hall seat count and projector availability. The room-by-room notes were

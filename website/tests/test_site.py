@@ -116,6 +116,8 @@ with sync_playwright() as p:
           page.locator(".gallery-item").count() == 13
           and page.locator('.gallery-item.is-feature img[src="/images/resort-dusk-mist.jpg"]').count() == 1
           and page.locator('.gallery-item img[src="/images/deck-dinner-sunset.jpg"]').count() == 1)
+    srcs = page.evaluate("[...document.querySelectorAll('.gallery-item img')].map(i => i.getAttribute('src'))")
+    check("gallery: no photo shown twice", len(srcs) == len(set(srcs)), f"{len(srcs)} tiles, {len(set(srcs))} different")
     # next/font self-hosts under hashed family names (e.g. __Cormorant_Garamond_ab12cd),
     # so look through the loaded FontFace entries rather than document.fonts.check().
     fonts_ok = page.evaluate(

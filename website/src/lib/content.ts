@@ -27,7 +27,6 @@ export const site = {
 
 export const images = {
   hero: { src: "/images/hero-sunset-deck.jpg", alt: "The We Land Resort sky deck and infinity pool at sunset, mountains fading into mist behind" },
-  building: { src: "/images/building-day.jpg", alt: "The terracotta main building with its rooftop terrace and glass-fronted ground floor" },
 };
 
 export const nav = [
@@ -171,15 +170,16 @@ export const gallery: GalleryItem[] = [
   { caption: "Garden path", image: { src: "/images/garden-path.jpg", alt: "A railed path winding down the hillside garden past a rock face" } },
   { caption: "Stairways at night", image: { src: "/images/stairs-night.jpg", alt: "Lit stairways through the garden at night" } },
   { caption: "Mural and swings", image: { src: "/images/mural-swing.jpg", alt: "A carved mural wall with a ship sculpture beside a nest swing and a bench swing" } },
-  { caption: "Mist over the forest", image: { src: "/images/aerial-mist.jpg", alt: "Aerial view of cloud rolling over the forested hills around the resort" } },
+  { caption: "The main building by day", image: { src: "/images/building-day.jpg", alt: "The terracotta main building with its rooftop terrace, outside stairway and glass-fronted ground floor" }, focus: "60% 50%" },
   { caption: "Evening at the pool", image: { src: "/images/pool-sunset-tall.jpg", alt: "The pool reflecting an orange evening sky" } },
 ];
 
-// Travel times as published for Kakkadampoyil by road.
+// Road distances from the resort's map pin; times allow for the hill road.
+// Estimates: ask the resort to confirm.
 export const routes = [
-  { from: "Calicut International Airport (CCJ)", how: "By road", time: "About 1 h" },
-  { from: "Kozhikode city and railway station", how: "By road", time: "About 45 min" },
-  { from: "Coimbatore", how: "By road", time: "About 2 h 30 min" },
+  { from: "Calicut International Airport (CCJ)", how: "By road, 40 km", time: "About 1 h 15 min" },
+  { from: "Kozhikode city and railway station", how: "By road, 50 km", time: "About 1 h 45 min" },
+  { from: "Coimbatore", how: "By road, 180 km", time: "About 4 h 30 min" },
 ];
 
 export const enquiryOptions = ["A room", "Two or more rooms", "The dormitory", "Conference hall", "Not sure yet"];

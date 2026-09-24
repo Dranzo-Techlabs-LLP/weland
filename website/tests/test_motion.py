@@ -45,6 +45,9 @@ def open_page(browser, width, height, touch=False, **kw):
         " window.__fogAt = performance.now(); }).observe(document, { childList: true, subtree: true });"
     )
     page = ctx.new_page()
+    # Headless Chromium draws the fog on the CPU; on a busy machine a screenshot
+    # can wait a long time for a frame, so allow more than the 30 s default.
+    page.set_default_timeout(90000)
     page.errors = []
     page.on("pageerror", lambda e: page.errors.append(str(e)))
     page.goto(BASE, wait_until="networkidle")
@@ -62,6 +65,19 @@ def top_of(page, selector):
 
 def overflow(page):
     return js(page, "document.documentElement.scrollWidth - document.documentElement.clientWidth")
+
+
+def near_identity(transform):
+    """True for no transform, or one that has settled to within a hair of none
+    (a scrubbed tween on a slow machine can stop a few millionths short)."""
+    if transform in ("none", "matrix(1, 0, 0, 1, 0, 0)"):
+        return True
+    nums = [float(n) for n in transform[transform.index("(") + 1 : -1].split(",")]
+    if len(nums) == 16:
+        ident, moves = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1], (12, 13, 14)
+    else:
+        ident, moves = [1, 0, 0, 1, 0, 0], (4, 5)
+    return all(abs(v - ident[i]) < (0.5 if i in moves else 1e-3) for i, v in enumerate(nums))
 
 
 def gallery_rows_full(page):
@@ -134,10 +150,15 @@ with sync_playwright() as p:
     stay = top_of(page, ".stay-main")
     page.evaluate(f"scrollTo(0, {stay - 900 * 0.85})"); page.wait_for_timeout(1300)
     tilted = js(page, "getComputedStyle(document.querySelector('.stay-main')).transform")
-    page.evaluate(f"scrollTo(0, {stay - 900 * 0.3})"); page.wait_for_timeout(1500)
-    flat = js(page, "getComputedStyle(document.querySelector('.stay-main')).transform")
+    page.evaluate(f"scrollTo(0, {stay - 900 * 0.3})")
+    # The scrub eases in behind the scroll; on a busy machine that takes a while, so wait for it to land.
+    for _ in range(20):
+        page.wait_for_timeout(500)
+        flat = js(page, "getComputedStyle(document.querySelector('.stay-main')).transform")
+        if near_identity(flat):
+            break
     check("room photo stands up from a tilt", tilted.startswith("matrix3d") and tilted != flat, tilted[:60])
-    check("room photo ends flat", flat in ("none", "matrix(1, 0, 0, 1, 0, 0)") or flat.startswith("matrix3d(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1,"), flat[:60])
+    check("room photo ends flat", near_identity(flat), flat[:60])
 
     gallery = top_of(page, ".gallery-grid")
     hidden = js(page, "[...document.querySelectorAll('.gallery-item')].filter(e => +getComputedStyle(e).opacity < 0.5).length")
@@ -161,6 +182,10 @@ with sync_playwright() as p:
     check("phone: WhatsApp button is icon-only", js(phone, "document.querySelector('.wa').getBoundingClientRect().width") <= 56)
     rows = gallery_rows_full(phone)
     check("phone: gallery rows are all full", rows["full"] and rows["columns"] == 2, str(rows))
+    phone.evaluate("scrollTo(0, document.documentElement.scrollHeight)"); phone.wait_for_timeout(600)
+    clash = js(phone, "(() => { const a = document.querySelector('.wa').getBoundingClientRect(), b = document.querySelector('.footer-small').getBoundingClientRect();"
+                      " return !(a.right <= b.left || a.left >= b.right || a.bottom <= b.top || a.top >= b.bottom); })()")
+    check("phone: WhatsApp button clear of the footer text", not clash)
     phone.screenshot(path=os.path.join(OUT, "layout-phone.png"))
     check("no page errors (phone)", not phone.errors, "; ".join(phone.errors)[:300])
     phone.context.close()

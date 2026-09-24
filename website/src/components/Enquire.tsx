@@ -21,16 +21,16 @@ export default function Enquire() {
               <a className="contact-link" href={site.phoneHref}>
                 <Phone size={18} aria-hidden="true" />
                 <span>
-                  {site.phone}
+                  <span className="contact-main">{site.phone}</span>
                   <small>Bookings and enquiries</small>
                 </span>
               </a>
             </li>
             <li>
               <a className="contact-link" href={site.whatsappHref} target="_blank" rel="noreferrer">
-                <WhatsAppIcon size={20} className="wa-green" />
+                <WhatsAppIcon size={18} className="wa-green" />
                 <span>
-                  Message us on WhatsApp
+                  <span className="contact-main">Message us on WhatsApp</span>
                   <small>{site.phone}</small>
                 </span>
               </a>
@@ -38,7 +38,7 @@ export default function Enquire() {
             <li>
               <a className="contact-link" href={`mailto:${site.email}`}>
                 <Mail size={18} aria-hidden="true" />
-                <span>{site.email}</span>
+                <span className="contact-main">{site.email}</span>
               </a>
             </li>
           </ul>

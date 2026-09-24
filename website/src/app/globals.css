@@ -90,6 +90,13 @@ ol {
   outline-offset: 3px;
 }
 
+/* on the wine panels a wine ring would vanish: gold there */
+.enquire :focus-visible,
+.menu :focus-visible,
+.footer :focus-visible {
+  outline-color: var(--gold);
+}
+
 ::selection {
   background: var(--wine);
   color: var(--paper);
@@ -1276,7 +1283,7 @@ ol {
   padding-block: 12px;
 }
 
-.contact-link:hover span {
+.contact-link:hover .contact-main {
   text-decoration: underline;
   text-underline-offset: 0.2em;
 }
@@ -1287,10 +1294,6 @@ ol {
   margin-top: 2px;
   font-size: 0.82rem;
   color: var(--gold);
-}
-
-.contact-link:hover small {
-  text-decoration: none;
 }
 
 /* WhatsApp's own green, wherever its logo appears */
@@ -1413,6 +1416,14 @@ ol {
   padding-block: 40px;
 }
 
+/* phones and tablets: the floating WhatsApp button sits over the bottom
+   corner, so leave room for it under the last line */
+@media (max-width: 899px) {
+  .footer {
+    padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
 .footer-grid {
   display: grid;
   gap: 28px;
@@ -1474,6 +1485,13 @@ ol {
 
 .wa:hover {
   background: #fff;
+}
+
+/* a pale halo under the ring, so it shows over any band of the page */
+.wa:focus-visible {
+  outline: 2px solid var(--wine);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 6px var(--paper);
 }
 
 /* WhatsApp's own green disc with the white logo */

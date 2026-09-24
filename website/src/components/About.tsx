@@ -24,7 +24,7 @@ export default function About() {
           </h2>
           <p className="about-text">{site.description}</p>
           <p className="about-text">
-            Kakkadampoyil sits at the edge of the Western Ghats, forty-five minutes above Kozhikode,
+            Kakkadampoyil sits at the edge of the Western Ghats, fifty kilometres up the hills from Kozhikode,
             and is known for exactly what you see from the deck: mist filling the valley at dawn,
             waterfalls a short drive away, and sunsets over ridge after ridge. The resort is small
             enough that the kitchen knows how you take your coffee by the second morning.
