@@ -56,7 +56,7 @@ primary CTA.
 | Above the mist — pinned aerial photo; scroll sinks the morning cloud    |
 | Stays — rooms band (+ room-by-room grid), dormitory band                |
 | Conference hall — text + facts, main photo + three details              |
-| Gallery (featured 2x2, even tiles) · Getting here (map + route table)   |
+| Gallery (justified rows, photos whole) · Getting here (map + routes)    |
 | Enquire — wine panel, gold accents, form pre-filled from the strip      |
 | Footer                                                                   |
 ```

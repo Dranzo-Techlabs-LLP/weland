@@ -1,3 +1,4 @@
+import InstagramIcon from "./InstagramIcon";
 import { nav, site } from "@/lib/content";
 
 export default function Footer() {
@@ -19,6 +20,10 @@ export default function Footer() {
             </a>
           ))}
           <a href="#enquire">Enquire</a>
+          <a href={site.instagram.href} className="footer-insta" target="_blank" rel="noreferrer">
+            <InstagramIcon size={16} />
+            Instagram
+          </a>
         </nav>
         <p className="footer-small">
           © {new Date().getFullYear()} {site.name}. {site.location}. Check-in {site.checkIn}, check-out {site.checkOut}.

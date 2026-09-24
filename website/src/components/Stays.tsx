@@ -1,6 +1,8 @@
+import Climate from "./Climate";
 import Photo from "./Photo";
 import Placeholder from "./Placeholder";
-import { stays } from "@/lib/content";
+import ViewPhoto from "./lightbox/ViewPhoto";
+import { stays, type PhotoGroup } from "@/lib/content";
 
 function sentence(items: string[]) {
   const lower = items.map((s, i) => (i === 0 ? s : s.charAt(0).toLowerCase() + s.slice(1)));
@@ -24,23 +26,32 @@ export default function Stays() {
         </div>
 
         <div>
-          {stays.map((stay) => (
+          {stays.map((stay) => {
+            // where each photo sits in this stay's slideshow (see photoGroups in content.ts)
+            const group = stay.slug as PhotoGroup;
+            const firstExtra = stay.image ? 1 : 0;
+            const firstUnit = firstExtra + stay.extras.length;
+            return (
             <article key={stay.slug} className="stay" id={stay.slug}>
               <div className="stay-media">
                 <div className="stay-main">
                   {stay.image ? (
-                    <Photo src={stay.image.src} alt={stay.image.alt} />
+                    <ViewPhoto group={group} index={0} label={stay.name}>
+                      <Photo src={stay.image.src} alt={stay.image.alt} />
+                    </ViewPhoto>
                   ) : (
                     <Placeholder caption={stay.placeholderCaption} seed={stay.slug} />
                   )}
                 </div>
                 {stay.extras.length > 0 && (
                   <ul className="stay-extras">
-                    {stay.extras.map((x) => (
+                    {stay.extras.map((x, i) => (
                       <li key={x.src}>
                         <figure>
                           <div className="stay-extra">
-                            <Photo src={x.src} alt={x.alt} />
+                            <ViewPhoto group={group} index={firstExtra + i} label={`${stay.name}, ${x.caption.toLowerCase()}`}>
+                              <Photo src={x.src} alt={x.alt} />
+                            </ViewPhoto>
                           </div>
                           <figcaption>{x.caption}</figcaption>
                         </figure>
@@ -55,7 +66,10 @@ export default function Stays() {
                 <p className="stay-desc">{stay.description}</p>
                 <dl className="stay-specs">
                   <dt>Count</dt>
-                  <dd>{stay.count}</dd>
+                  <dd className="stay-count">
+                    {stay.count}
+                    <Climate kind={stay.climate} />
+                  </dd>
                   <dt>Sleeps</dt>
                   <dd>{stay.sleeps}</dd>
                   <dt>Bathroom</dt>
@@ -81,10 +95,12 @@ export default function Stays() {
                   <p className="units-hint">Swipe to see all {stay.units.length} rooms.</p>
                   {/* focusable so the row can be scrolled from the keyboard when it becomes a carousel */}
                   <ul className="units-grid" tabIndex={0} aria-label="The rooms, one by one">
-                    {stay.units.map((u) => (
+                    {stay.units.map((u, i) => (
                       <li key={u.id} className="unit">
                         <div className="unit-media">
-                          <Photo src={u.image.src} alt={u.image.alt} />
+                          <ViewPhoto group={group} index={firstUnit + i} label={u.name}>
+                            <Photo src={u.image.src} alt={u.image.alt} />
+                          </ViewPhoto>
                         </div>
                         <h5 className="unit-name">{u.name}</h5>
                         <p className="unit-note">{u.note}</p>
@@ -94,7 +110,8 @@ export default function Stays() {
                 </div>
               )}
             </article>
-          ))}
+            );
+          })}
         </div>
       </div>
     </section>

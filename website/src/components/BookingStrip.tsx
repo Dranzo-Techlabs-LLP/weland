@@ -10,6 +10,9 @@ export interface Prefill {
 
 export const PREFILL_EVENT = "weland:prefill";
 
+/** Guest counts to choose from: enough for the whole dormitory (16) and more. */
+export const GUEST_OPTIONS = Array.from({ length: 30 }, (_, i) => i + 1);
+
 function addDays(iso: string, days: number) {
   if (!iso) return "";
   const d = new Date(iso + "T00:00:00");
@@ -61,7 +64,7 @@ export default function BookingStrip() {
         <div className="strip-field">
           <label htmlFor="strip-guests">Guests</label>
           <select id="strip-guests" value={guests} onChange={(e) => setGuests(e.target.value)}>
-            {Array.from({ length: 9 }, (_, i) => i + 1).map((n) => (
+            {GUEST_OPTIONS.map((n) => (
               <option key={n} value={String(n)}>
                 {n} {n === 1 ? "guest" : "guests"}
               </option>

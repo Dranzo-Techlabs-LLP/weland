@@ -81,15 +81,17 @@ def near_identity(transform):
 
 
 def gallery_rows_full(page):
-    """Every column of the gallery ends at the same line (no gaps, no ragged end).
+    """Every gallery row runs edge to edge and its photos share one height.
     Uses layout boxes, so tiles still waiting to be revealed don't skew it."""
     return js(page, """(() => {
-      const items = [...document.querySelectorAll('.gallery-item')].map(e => ({ left: e.offsetLeft, bottom: e.offsetTop + e.offsetHeight }));
-      const bottom = Math.max(...items.map(i => i.bottom));
-      const cols = {};
-      items.forEach(i => { cols[i.left] = Math.max(cols[i.left] || 0, i.bottom); });
-      const ends = Object.values(cols);
-      return { columns: ends.length, full: ends.every(b => Math.abs(b - bottom) <= 1) };
+      const box = document.querySelector('.gallery-rows');
+      const W = box.clientWidth;
+      const rows = [...document.querySelectorAll('.gallery-row')].map(r => {
+        const t = [...r.children];
+        const last = t[t.length - 1];
+        return { left: t[0].offsetLeft, right: W - (last.offsetLeft + last.offsetWidth), heights: new Set(t.map(x => x.offsetHeight)).size };
+      });
+      return { rows: rows.length, full: rows.every(r => Math.abs(r.left) <= 1 && Math.abs(r.right) <= 1 && r.heights === 1) };
     })()""")
 
 
@@ -160,14 +162,16 @@ with sync_playwright() as p:
     check("room photo stands up from a tilt", tilted.startswith("matrix3d") and tilted != flat, tilted[:60])
     check("room photo ends flat", near_identity(flat), flat[:60])
 
-    gallery = top_of(page, ".gallery-grid")
-    hidden = js(page, "[...document.querySelectorAll('.gallery-item')].filter(e => +getComputedStyle(e).opacity < 0.5).length")
+    gallery = top_of(page, ".gallery-rows")
+    hidden = js(page, "[...document.querySelectorAll('.gallery-tile')].filter(e => +getComputedStyle(e).opacity < 0.5).length")
     page.evaluate(f"scrollTo(0, {gallery - 400})"); page.wait_for_timeout(1800)
-    shown = js(page, "[...document.querySelectorAll('.gallery-item')].slice(0, 4).every(e => +getComputedStyle(e).opacity > 0.95)")
+    # the tiles now on screen (whatever the row heights) have all come in
+    shown = js(page, "(() => { const on = [...document.querySelectorAll('.gallery-tile')].filter(e => e.getBoundingClientRect().top < innerHeight * 0.75);"
+                     " return on.length > 0 && on.every(e => +getComputedStyle(e).opacity > 0.95); })()")
     check("gallery tiles wait below the fold, then reveal", hidden > 0 and shown, f"{hidden} waiting")
 
     rows = gallery_rows_full(page)
-    check("desktop: gallery rows are all full", rows["full"] and rows["columns"] == 4, str(rows))
+    check("desktop: gallery rows run edge to edge", rows["full"], str(rows))
 
     check("no page errors (desktop)", not page.errors, "; ".join(page.errors)[:300])
     page.context.close()
@@ -181,7 +185,7 @@ with sync_playwright() as p:
     check("phone: rooms become a swipeable row", rooms["scroll"] and "x" in rooms["snap"], str(rooms))
     check("phone: WhatsApp button is icon-only", js(phone, "document.querySelector('.wa').getBoundingClientRect().width") <= 56)
     rows = gallery_rows_full(phone)
-    check("phone: gallery rows are all full", rows["full"] and rows["columns"] == 2, str(rows))
+    check("phone: gallery rows run edge to edge", rows["full"], str(rows))
     phone.evaluate("scrollTo(0, document.documentElement.scrollHeight)"); phone.wait_for_timeout(600)
     clash = js(phone, "(() => { const a = document.querySelector('.wa').getBoundingClientRect(), b = document.querySelector('.footer-small').getBoundingClientRect();"
                       " return !(a.right <= b.left || a.left >= b.right || a.bottom <= b.top || a.top >= b.bottom); })()")
@@ -198,7 +202,7 @@ with sync_playwright() as p:
     cols = js(land, "getComputedStyle(document.querySelector('.hero')).gridTemplateColumns.split(' ').length")
     check("landscape phone: hero side by side", cols == 2 and overflow(land) <= 0, f"{cols} columns")
     rows = gallery_rows_full(land)
-    check("landscape phone: gallery rows are all full", rows["full"] and rows["columns"] == 3, str(rows))
+    check("landscape phone: gallery rows run edge to edge", rows["full"], str(rows))
     land.screenshot(path=os.path.join(OUT, "layout-landscape.png"))
     land.context.close()
 
@@ -226,7 +230,7 @@ with sync_playwright() as p:
         fog: !!document.querySelector('.mist-clouds'),
         veil: +getComputedStyle(document.querySelector('.mist-veil')).opacity,
         parallax: getComputedStyle(document.querySelector('[data-hero-parallax]')).transform,
-        waiting: [...document.querySelectorAll('.gallery-item, .unit')].filter(e => +getComputedStyle(e).opacity < 1).length })""")
+        waiting: [...document.querySelectorAll('.gallery-tile, .unit')].filter(e => +getComputedStyle(e).opacity < 1).length })""")
     check("reduced motion: no scroll runway, all lines shown", state["h"] < 900 and state["beats"], f"{state['h']:.0f}px")
     check("reduced motion: the clear view, no fog", state["photo"] and not state["fog"] and state["veil"] == 0, str(state))
     check("reduced motion: nothing drifts or waits to appear", state["parallax"] == "none" and state["waiting"] == 0, str(state))

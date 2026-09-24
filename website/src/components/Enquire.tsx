@@ -1,5 +1,6 @@
 import { Mail, Phone } from "lucide-react";
 import EnquiryForm from "./EnquiryForm";
+import InstagramIcon from "./InstagramIcon";
 import WhatsAppIcon from "./WhatsAppIcon";
 import { site } from "@/lib/content";
 
@@ -12,9 +13,9 @@ export default function Enquire() {
             Tell us your dates. <em>We reply within a day.</em>
           </h2>
           <p className="lede">
-            There is no instant booking here on purpose. Send the form and someone who knows the
-            place will come back to you with availability, a rate, and honest advice on which stay
-            suits your group.
+            There is no instant booking here on purpose. Send the form and it opens WhatsApp with
+            your details filled in; someone who knows the place will come back to you with
+            availability, a rate, and honest advice on which stay suits your group.
           </p>
           <ul className="contact-list">
             <li>
@@ -39,6 +40,15 @@ export default function Enquire() {
               <a className="contact-link" href={`mailto:${site.email}`}>
                 <Mail size={18} aria-hidden="true" />
                 <span className="contact-main">{site.email}</span>
+              </a>
+            </li>
+            <li>
+              <a className="contact-link" href={site.instagram.href} target="_blank" rel="noreferrer">
+                <InstagramIcon size={18} />
+                <span>
+                  <span className="contact-main">{site.instagram.handle}</span>
+                  <small>Photos and news on Instagram</small>
+                </span>
               </a>
             </li>
           </ul>

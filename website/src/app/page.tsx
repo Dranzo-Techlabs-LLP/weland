@@ -9,10 +9,11 @@ import Location from "@/components/Location";
 import Enquire from "@/components/Enquire";
 import Footer from "@/components/Footer";
 import ScrollMotion from "@/components/ScrollMotion";
+import LightboxProvider from "@/components/lightbox/LightboxProvider";
 
 export default function Home() {
   return (
-    <>
+    <LightboxProvider>
       <main id="top">
         <Hero />
         <BookingStrip />
@@ -27,6 +28,6 @@ export default function Home() {
       <Footer />
       {/* All page-level scroll effects live in one place; renders nothing */}
       <ScrollMotion />
-    </>
+    </LightboxProvider>
   );
 }

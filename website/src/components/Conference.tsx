@@ -1,6 +1,10 @@
 import Photo from "./Photo";
 import Placeholder from "./Placeholder";
+import ViewPhoto from "./lightbox/ViewPhoto";
 import { conference } from "@/lib/content";
+
+// where the extras start in the hall's slideshow (see photoGroups in content.ts)
+const firstExtra = conference.image ? 1 : 0;
 
 export default function Conference() {
   return (
@@ -26,18 +30,22 @@ export default function Conference() {
         <div className="conference-media">
           <div className="conference-main">
             {conference.image ? (
-              <Photo src={conference.image.src} alt={conference.image.alt} />
+              <ViewPhoto group="conference" index={0} label="The conference hall">
+                <Photo src={conference.image.src} alt={conference.image.alt} />
+              </ViewPhoto>
             ) : (
               <Placeholder caption={conference.placeholderCaption} seed="conference-hall" />
             )}
           </div>
           {conference.extras.length > 0 && (
             <ul className="conference-extras">
-              {conference.extras.map((x) => (
+              {conference.extras.map((x, i) => (
                 <li key={x.src}>
                   <figure>
                     <div className="conference-extra">
-                      <Photo src={x.src} alt={x.alt} />
+                      <ViewPhoto group="conference" index={firstExtra + i} label={`The hall, ${x.caption.toLowerCase()}`}>
+                        <Photo src={x.src} alt={x.alt} />
+                      </ViewPhoto>
                     </div>
                     <figcaption>{x.caption}</figcaption>
                   </figure>

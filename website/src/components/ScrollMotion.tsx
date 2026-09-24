@@ -81,7 +81,7 @@ function photosSettle(wide: boolean) {
 }
 
 function revealOnce() {
-  const items = gsap.utils.toArray<HTMLElement>(".gallery-item, .unit");
+  const items = gsap.utils.toArray<HTMLElement>(".gallery-tile, .unit");
   // Only what's still below the fold waits for its reveal; nothing on screen is hidden.
   const later = items.filter((el) => el.getBoundingClientRect().top > window.innerHeight * 0.9);
   if (!later.length) return;

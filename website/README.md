@@ -26,10 +26,17 @@ npm install
 npm run dev          # http://localhost:3050
 ```
 
-The enquiry form posts to `/api/enquiry`, which the Next dev server doesn't
-have. To try the form in dev, set `NEXT_PUBLIC_API_BASE` in `.env.local` (see
-`.env.local.example`), or run the whole site with `npm run build:all` and
-`npm run preview:all` from the repo root.
+Sending the enquiry form opens WhatsApp with the guest's details written out,
+addressed to the booking number; the guest presses send there. It also posts a
+copy to `/api/enquiry`, which the Next dev server doesn't have (the copy is
+simply dropped in dev). To try that part, set `NEXT_PUBLIC_API_BASE` in
+`.env.local` (see `.env.local.example`), or run the whole site with
+`npm run build:all` and `npm run preview:all` from the repo root.
+
+Every photo (gallery, rooms, dormitory, hall) opens full screen as a slideshow
+of its group, with `yet-another-react-lightbox` as on the Kakkadampoyil Villas
+site. The gallery shows each photo whole, in justified rows that run edge to
+edge (`src/components/GalleryRows.tsx`).
 
 ## Test
 
@@ -53,7 +60,7 @@ Everything editable is in `src/lib/content.ts`. Photos are pre-sized web copies
 
 | Source folder | Used for |
 |---------------|----------|
-| `GEN`  | hero (sky deck at sunset), above the mist (aerial), gallery (12 photos, incl. the deck table and the building by day) |
+| `GEN`  | hero (sky deck at sunset), above the mist (aerial), and the gallery: every GEN photo, shown whole |
 | `A1`–`A6` | "The Rooms" band and the room-by-room grid (one photo per room) |
 | `DOM`  | "The Dormitory" band (bunks, exterior, deck at dusk, washrooms) |
 | `HALL` | conference hall (wide shot, stage wall, carrom/seating, washrooms) |
@@ -65,17 +72,22 @@ The featured gallery photo (`resort-dusk-mist.jpg`, the resort from the air at
 dusk) was supplied separately.
 
 Contact details in `content.ts`: bookings and WhatsApp on +91 90744 24142,
-check-in 3:00 pm, check-out 12:00 noon, and the address, map and "Open in
-Google Maps" link from the resort's Google Maps listing.
+email welandresort0072@gmail.com, Instagram @weland.resort, check-in 3:00 pm,
+check-out 12:00 noon, and the address, map and "Open in Google Maps" link from
+the resort's Google Maps listing. Rooms are A1-A4, B1 and B2 (as in the admin),
+all non-AC; the dormitory is air-conditioned, with 16 bunk beds.
 
 The "Getting here" distances are measured from the map pin and the times are
 estimates for the hill road: worth confirming with the resort.
 
-Still marked **PLACEHOLDER** in `content.ts`: email, all rates, the dormitory bed count,
-the hall seat count and projector availability. The room-by-room notes were
+Still marked **PLACEHOLDER** in `content.ts`: all rates, the hall seat count and
+projector availability. The room-by-room notes were
 written from the photos and should be checked by the resort.
 
-## Enquiry email
+## Enquiries
 
-Handled by the PHP API (`server/api/index.php`, route `POST /api/enquiry`) and
-configured in the server's `api/config.php`. See the root README.
+Guests send them on WhatsApp (see above). The copy that reaches the PHP API
+(`server/api/index.php`, route `POST /api/enquiry`) is emailed to
+`ENQUIRY_TO_EMAIL` in the server's `api/config.php` when that is set (e.g. to
+welandresort0072@gmail.com), and otherwise written to the API's error log.
+See the root README.

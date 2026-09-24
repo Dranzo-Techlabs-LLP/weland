@@ -7,3 +7,6 @@ next-env.d.ts
 *.log
 .DS_Store
 tests/screenshots
+
+# Python bytecode from running the tests
+__pycache__/

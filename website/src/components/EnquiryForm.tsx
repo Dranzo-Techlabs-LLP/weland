@@ -1,15 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { PREFILL_EVENT, type Prefill } from "./BookingStrip";
-import { enquiryOptions } from "@/lib/content";
+import { GUEST_OPTIONS, PREFILL_EVENT, type Prefill } from "./BookingStrip";
+import WhatsAppIcon from "./WhatsAppIcon";
+import { enquiryOptions, site } from "@/lib/content";
 
-type Status = "idle" | "sending" | "sent" | "error";
-
-// The PHP API (server/api in the repo) lives at /api on the same domain.
-// NEXT_PUBLIC_API_BASE only needs setting for `npm run dev`; see .env.local.example.
+// Sending opens WhatsApp with the enquiry written out, addressed to the
+// resort's booking number; the guest presses send there. A copy also goes to
+// the PHP API (server/api, at /api on the same domain), which emails it when
+// the server has ENQUIRY_TO_EMAIL set and logs it otherwise, so nothing is lost
+// if the guest never presses send. NEXT_PUBLIC_API_BASE is only for `npm run dev`.
 const API_BASE = (process.env.NEXT_PUBLIC_API_BASE || "/api").replace(/\/$/, "");
-const SEND_FAILED = "The enquiry could not be sent. Please call or WhatsApp us.";
 
 interface Values {
   name: string;
@@ -33,6 +34,37 @@ const empty: Values = {
   notes: "",
 };
 
+/** "2026-10-10" -> "Sat, 10 Oct 2026", read as a calendar date (no time zone shift) */
+function longDate(iso: string) {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short", year: "numeric" });
+}
+
+function nights(checkIn: string, checkOut: string) {
+  const day = (iso: string) => {
+    const [y, m, d] = iso.split("-").map(Number);
+    return Date.UTC(y, m - 1, d);
+  };
+  return Math.round((day(checkOut) - day(checkIn)) / 86_400_000);
+}
+
+/** The enquiry as a WhatsApp message (*...* is bold in WhatsApp). */
+function enquiryMessage(v: Values) {
+  const n = nights(v.checkIn, v.checkOut);
+  return [
+    `Hello ${site.name}! I'd like to enquire about a stay.`,
+    "",
+    `*Name:* ${v.name.trim()}`,
+    `*Phone:* ${v.phone.trim()}`,
+    `*Email:* ${v.email.trim()}`,
+    `*Stay:* ${v.stay}`,
+    `*Check-in:* ${longDate(v.checkIn)}`,
+    `*Check-out:* ${longDate(v.checkOut)} (${n} ${n === 1 ? "night" : "nights"})`,
+    `*Guests:* ${v.guests}`,
+    ...(v.notes.trim() ? [`*Notes:* ${v.notes.trim()}`] : []),
+  ].join("\n");
+}
+
 function validate(v: Values) {
   const errors: Partial<Record<keyof Values, string>> = {};
   if (v.name.trim().length < 2) errors.name = "Enter your name.";
@@ -48,8 +80,8 @@ function validate(v: Values) {
 export default function EnquiryForm() {
   const [values, setValues] = useState<Values>(empty);
   const [errors, setErrors] = useState<Partial<Record<keyof Values, string>>>({});
-  const [status, setStatus] = useState<Status>("idle");
-  const [message, setMessage] = useState("");
+  // the WhatsApp link for the last enquiry sent, kept so it can be opened again
+  const [sent, setSent] = useState<{ link: string; opened: boolean } | null>(null);
   // Honeypot: hidden from people, filled in by form-spamming bots.
   const [trap, setTrap] = useState("");
 
@@ -72,37 +104,31 @@ export default function EnquiryForm() {
     if (errors[key]) setErrors((er) => ({ ...er, [key]: undefined }));
   };
 
-  const onSubmit = async (e: React.FormEvent) => {
+  const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const found = validate(values);
     setErrors(found);
     if (Object.keys(found).length) return;
 
-    setStatus("sending");
-    setMessage("");
-    try {
-      const res = await fetch(`${API_BASE}/enquiry`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...values, website: trap }),
-      });
-      // Parse defensively: a proxy or host error page is HTML, not JSON.
-      const text = await res.text();
-      let json: { ok?: boolean; error?: string } = {};
-      try {
-        json = text ? JSON.parse(text) : {};
-      } catch {
-        json = {};
-      }
-      if (!res.ok || !json.ok) throw new Error(json.error || SEND_FAILED);
-      setStatus("sent");
-      setMessage("Enquiry sent. We will reply within a day.");
-      setValues(empty);
-    } catch (err) {
-      setStatus("error");
-      // fetch() itself rejects with a TypeError when the network is down.
-      setMessage(err instanceof Error && !(err instanceof TypeError) ? err.message : SEND_FAILED);
+    const link = `https://wa.me/${site.whatsappNumber}?text=${encodeURIComponent(enquiryMessage(values))}`;
+    // Open WhatsApp straight away, while this is still the click: browsers block
+    // pop-ups opened later. Bots (the honeypot filled in) get nowhere.
+    let opened = false;
+    if (!trap) {
+      const tab = window.open(link, "_blank");
+      opened = Boolean(tab);
+      if (tab) tab.opener = null;
     }
+    setSent({ link, opened });
+
+    // The copy for the resort's records. keepalive lets it finish even if the
+    // guest's phone switches to the WhatsApp app right away.
+    fetch(`${API_BASE}/enquiry`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...values, website: trap }),
+      keepalive: true,
+    }).catch(() => {});
   };
 
   return (
@@ -154,7 +180,7 @@ export default function EnquiryForm() {
         <div className="field">
           <label htmlFor="enq-guests">Guests</label>
           <select id="enq-guests" name="guests" value={values.guests} onChange={set("guests")}>
-            {Array.from({ length: 9 }, (_, i) => i + 1).map((n) => (
+            {GUEST_OPTIONS.map((n) => (
               <option key={n} value={String(n)}>
                 {n} {n === 1 ? "guest" : "guests"}
               </option>
@@ -185,14 +211,23 @@ export default function EnquiryForm() {
         />
       </div>
       <div className="form-foot">
-        <button type="submit" className="btn btn-paper" disabled={status === "sending"}>
-          {status === "sending" ? "Sending" : "Send enquiry"}
+        <button type="submit" className="btn btn-paper btn-wa">
+          <WhatsAppIcon size={18} className="wa-green" />
+          Send enquiry
         </button>
-        {message && (
-          <p className={`form-status ${status === "sent" ? "is-ok" : "is-error"}`} role="status" aria-live="polite">
-            {message}
-          </p>
-        )}
+        <p className="form-hint">Opens WhatsApp with your details filled in, ready to send to us.</p>
+        <p className="form-status is-ok" role="status" aria-live="polite">
+          {sent && (
+            <>
+              {sent.opened
+                ? "WhatsApp has opened with your enquiry. Press send there and we will reply soon."
+                : "Your enquiry is ready in WhatsApp."}{" "}
+              <a href={sent.link} target="_blank" rel="noreferrer">
+                {sent.opened ? "Open it again" : "Open WhatsApp to send it"}
+              </a>
+            </>
+          )}
+        </p>
       </div>
     </form>
   );

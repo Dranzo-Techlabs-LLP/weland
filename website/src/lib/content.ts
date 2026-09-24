@@ -14,8 +14,10 @@ export const site = {
   // Bookings and enquiries; the same number takes WhatsApp messages.
   phone: "+91 90744 24142",
   phoneHref: "tel:+919074424142",
+  whatsappNumber: "919074424142", // digits only, with the country code
   whatsappHref: `https://wa.me/919074424142?text=${encodeURIComponent("Hello! I'd like to ask about a stay at We Land Resort.")}`,
-  email: "hello@welandresort.com", // PLACEHOLDER
+  email: "welandresort0072@gmail.com",
+  instagram: { href: "https://www.instagram.com/weland.resort/", handle: "@weland.resort" },
   // As on the resort's Google Maps listing.
   address: ["We Land Resort", "Foggy Mountain, Park Road", "Kakkadampoyil, Kozhikode, Kerala 673604"],
   mapsHref: "https://maps.app.goo.gl/sK3fXUWg9pns3AEaA",
@@ -55,6 +57,8 @@ export interface Stay {
   fromPrice: string; // PLACEHOLDER rates
   priceUnit: string;
   image: { src: string; alt: string } | null; // null → designed placeholder until photos arrive
+  /** Air-conditioned or not: shown as an icon beside the count */
+  climate: "ac" | "non-ac";
   placeholderCaption: string;
   extras: { src: string; alt: string; caption: string }[];
   units?: Unit[];
@@ -67,7 +71,7 @@ export const stays: Stay[] = [
     name: "The Rooms",
     summary: "Six rooms in the main building, each opening onto a terrace and the hills.",
     description:
-      "Six rooms across two floors of the main building, with the rooftop above and the pool and sky deck a few steps away. Every room has a wide sliding window onto a turf terrace with chairs, wood-panelled walls, an electric kettle, a wardrobe and an attached bathroom with a glass shower and hot water. Room A1 has two beds for a family; A6 is the largest, with a sitting area.",
+      "Six rooms across two floors of the main building, with the rooftop above and the pool and sky deck a few steps away. Every room has a wide sliding window onto a turf terrace with chairs, wood-panelled walls, an electric kettle, a wardrobe and an attached bathroom with a glass shower and hot water. Room A1 has two beds for a family; B2 is the largest, with a sitting area.",
     count: "6 rooms",
     sleeps: "2 adults and 1 child; room A1 sleeps 4",
     bathroom: "Attached, glass shower, hot water",
@@ -75,6 +79,7 @@ export const stays: Stay[] = [
     fromPrice: "₹4,500",
     priceUnit: "per night, from",
     image: { src: "/images/room-view.jpg", alt: "A room with the bed facing wide windows onto the misty valley" },
+    climate: "non-ac",
     placeholderCaption: "Photo: a room",
     extras: [
       { src: "/images/room-terrace.jpg", alt: "The turf terrace outside the rooms with hanging lamps and rattan chairs", caption: "The terrace outside" },
@@ -86,8 +91,8 @@ export const stays: Stay[] = [
       { id: "A2", name: "Room A2", note: "A double with a wardrobe and kettle, opening onto the shared terrace with the hanging lamps.", image: { src: "/images/room-a2.jpg", alt: "Room A2 with a double bed and wardrobe" } },
       { id: "A3", name: "Room A3", note: "A double beside the stairway to the terrace. The big window faces the trees.", image: { src: "/images/room-a3.jpg", alt: "Room A3 with a double bed and tall curtained windows" } },
       { id: "A4", name: "Room A4", note: "A double on the terrace level, with chairs outside the door under the deck.", image: { src: "/images/room-a4.jpg", alt: "Room A4 with a double bed facing the window" } },
-      { id: "A5", name: "Room A5", note: "A double at the end of the row, where the balcony looks straight down the valley at dusk.", image: { src: "/images/room-a5.jpg", alt: "Room A5 with a double bed and a chair by the window" } },
-      { id: "A6", name: "Room A6", note: "The largest room: a double with a sitting area, two chairs and a desk under pendant lights.", image: { src: "/images/room-a6.jpg", alt: "Room A6 with a double bed, a desk and two chairs" } },
+      { id: "B1", name: "Room B1", note: "A double at the end of the row, where the balcony looks straight down the valley at dusk.", image: { src: "/images/room-b1.jpg", alt: "Room B1 with a double bed and a chair by the window" } },
+      { id: "B2", name: "Room B2", note: "The largest room: a double with a sitting area, two chairs and a desk under pendant lights.", image: { src: "/images/room-b2.jpg", alt: "Room B2 with a double bed, a desk and two chairs" } },
     ],
     highlights: ["Attached bathroom with hot water", "Terrace with chairs", "Electric kettle", "Wardrobe"],
   },
@@ -98,12 +103,13 @@ export const stays: Stay[] = [
     description:
       "A separate block below the main building with air-conditioned bunk beds, shared washrooms with several cubicles, and a covered deck that cantilevers over the slope, which is where the group ends up every evening. Made for trekking groups, student trips, corporate teams and big families travelling together.",
     count: "1 dormitory block",
-    sleeps: "Up to 10 in bunk beds", // PLACEHOLDER — confirm the bed count
+    sleeps: "Up to 16, in 16 bunk beds",
     bathroom: "Shared washrooms, hot water",
     view: "Forest and valley from the deck",
     fromPrice: "₹1,200",
     priceUnit: "per bed per night, from",
     image: { src: "/images/dorm-bunks.jpg", alt: "The dormitory with rows of wooden bunk beds and black steel ladders" },
+    climate: "ac",
     placeholderCaption: "Photo: the dormitory",
     extras: [
       { src: "/images/dorm-exterior.jpg", alt: "The dormitory block with its covered deck cantilevered over the slope", caption: "The block and its deck" },
@@ -149,29 +155,30 @@ export const mist = {
 
 export interface GalleryItem {
   caption: string;
-  image: { src: string; alt: string } | null;
-  /** The big tile at the start of the gallery, shown with its caption */
+  /** w and h are the file's pixel size: the gallery shows every photo whole, in its own shape */
+  image: { src: string; alt: string; w: number; h: number };
+  /** Leads the gallery, larger, with its caption showing */
   feature?: boolean;
-  /** Which part of the photo to keep when the tile crops it (CSS object-position) */
-  focus?: string;
 }
 
-// The first photo is featured. All the others share one tile size, so every
-// row comes out full on any screen: twelve tiles fill 4, 3 or 2 columns.
+// All the resort photos (the GEN set), each shown whole. The layout puts them
+// in rows that run edge to edge (GalleryRows.tsx); tap any one for the slideshow.
 export const gallery: GalleryItem[] = [
-  { caption: "We Land at dusk, above the mist", image: { src: "/images/resort-dusk-mist.jpg", alt: "Aerial view of We Land Resort at dusk: the lit main building, the pool and the garden paths on the forested hilltop, with mist lying over the hills behind" }, feature: true, focus: "55% 62%" },
-  { caption: "The pool at sunset", image: { src: "/images/pool-sunset.jpg", alt: "The infinity pool at sunset with the sun setting behind the mountains" } },
-  { caption: "The sky deck in mist", image: { src: "/images/sky-deck-mist.jpg", alt: "The red-roofed sky deck gateway leading out into the mist" }, focus: "50% 35%" },
-  { caption: "Dinner on the sky deck", image: { src: "/images/deck-dinner-sunset.jpg", alt: "A table set at the end of the sky deck at sunset, hills in every direction" } },
-  { caption: "The building at dusk", image: { src: "/images/building-dusk.jpg", alt: "The main building lit up at dusk with string lights along the terrace" } },
-  { caption: "Play area", image: { src: "/images/play-area.jpg", alt: "Swings and a slide on the paved terrace with hills behind" } },
-  { caption: "Campfire", image: { src: "/images/campfire-night.jpg", alt: "Guests around a campfire at night under strings of lights" } },
-  { caption: "Pool and slide by day", image: { src: "/images/pool-slide-day.jpg", alt: "The pool, the sky deck gateway and a children's slide on a cloudy afternoon" } },
-  { caption: "Garden path", image: { src: "/images/garden-path.jpg", alt: "A railed path winding down the hillside garden past a rock face" } },
-  { caption: "Stairways at night", image: { src: "/images/stairs-night.jpg", alt: "Lit stairways through the garden at night" } },
-  { caption: "Mural and swings", image: { src: "/images/mural-swing.jpg", alt: "A carved mural wall with a ship sculpture beside a nest swing and a bench swing" } },
-  { caption: "The main building by day", image: { src: "/images/building-day.jpg", alt: "The terracotta main building with its rooftop terrace, outside stairway and glass-fronted ground floor" }, focus: "60% 50%" },
-  { caption: "Evening at the pool", image: { src: "/images/pool-sunset-tall.jpg", alt: "The pool reflecting an orange evening sky" } },
+  { caption: "We Land at dusk, above the mist", image: { src: "/images/resort-dusk-mist.jpg", alt: "Aerial view of We Land Resort at dusk: the lit main building, the pool and the garden paths on the forested hilltop, with mist lying over the hills behind", w: 2000, h: 1500 }, feature: true },
+  { caption: "The sky deck and pool at sunset", image: { src: "/images/hero-sunset-deck.jpg", alt: "The sky deck and infinity pool at sunset, mountains fading into mist behind", w: 2400, h: 1623 } },
+  { caption: "The pool at sunset", image: { src: "/images/pool-sunset.jpg", alt: "The infinity pool at sunset with the sun setting behind the mountains", w: 2000, h: 1356 } },
+  { caption: "The sky deck in mist", image: { src: "/images/sky-deck-mist.jpg", alt: "The red-roofed sky deck gateway leading out into the mist", w: 1078, h: 1600 } },
+  { caption: "Dinner on the sky deck", image: { src: "/images/deck-dinner-sunset.jpg", alt: "A table set at the end of the sky deck at sunset, hills in every direction", w: 2000, h: 1353 } },
+  { caption: "The building at dusk", image: { src: "/images/building-dusk.jpg", alt: "The main building lit up at dusk with string lights along the terrace", w: 1600, h: 1177 } },
+  { caption: "The resort from the air", image: { src: "/images/aerial-resort.jpg", alt: "The main building and the pool on the hilltop from the air, forest falling away below and mist along the ridge", w: 2000, h: 1500 } },
+  { caption: "Play area", image: { src: "/images/play-area.jpg", alt: "Swings and a slide on the paved terrace with hills behind", w: 1600, h: 1085 } },
+  { caption: "Campfire", image: { src: "/images/campfire-night.jpg", alt: "Guests around a campfire at night under strings of lights", w: 1600, h: 1043 } },
+  { caption: "Garden path", image: { src: "/images/garden-path.jpg", alt: "A railed path winding down the hillside garden past a rock face", w: 1067, h: 1600 } },
+  { caption: "Pool and slide by day", image: { src: "/images/pool-slide-day.jpg", alt: "The pool, the sky deck gateway and a children's slide on a cloudy afternoon", w: 2000, h: 1333 } },
+  { caption: "Stairways at night", image: { src: "/images/stairs-night.jpg", alt: "Lit stairways through the garden at night", w: 1600, h: 1067 } },
+  { caption: "Mural and swings", image: { src: "/images/mural-swing.jpg", alt: "A carved mural wall with a ship sculpture beside a nest swing and a bench swing", w: 1600, h: 1067 } },
+  { caption: "The main building by day", image: { src: "/images/building-day.jpg", alt: "The terracotta main building with its rooftop terrace, outside stairway and glass-fronted ground floor", w: 2000, h: 1276 } },
+  { caption: "Evening at the pool", image: { src: "/images/pool-sunset-tall.jpg", alt: "The pool reflecting an orange evening sky", w: 1085, h: 1600 } },
 ];
 
 // Road distances from the resort's map pin; times allow for the hill road.
@@ -183,3 +190,36 @@ export const routes = [
 ];
 
 export const enquiryOptions = ["A room", "Two or more rooms", "The dormitory", "Conference hall", "Not sure yet"];
+
+// ---------- full-screen slideshows ----------
+
+/** A photo in a full-screen slideshow */
+export interface Slide {
+  src: string;
+  alt: string;
+  caption: string;
+  w?: number;
+  h?: number;
+}
+
+/** A stay's photos in page order: the main one, the ones beside it, then room by room. */
+function stayPhotos(stay: Stay): Slide[] {
+  return [
+    ...(stay.image ? [{ ...stay.image, caption: stay.name }] : []),
+    ...stay.extras.map((x) => ({ src: x.src, alt: x.alt, caption: `${stay.name}: ${x.caption.toLowerCase()}` })),
+    ...(stay.units ?? []).map((u) => ({ ...u.image, caption: `${u.name}. ${u.note}` })),
+  ];
+}
+
+// Tap a photo and its whole group plays as slides.
+export const photoGroups = {
+  gallery: gallery.map((g) => ({ ...g.image, caption: g.caption })),
+  rooms: stayPhotos(stays[0]),
+  dormitory: stayPhotos(stays[1]),
+  conference: [
+    ...(conference.image ? [{ ...conference.image, caption: "The conference hall" }] : []),
+    ...conference.extras.map((x) => ({ src: x.src, alt: x.alt, caption: `The hall: ${x.caption.toLowerCase()}` })),
+  ],
+} satisfies Record<string, Slide[]>;
+
+export type PhotoGroup = keyof typeof photoGroups;

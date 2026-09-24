@@ -147,7 +147,9 @@ with sync_playwright() as p:
     page.wait_for_selector("form p", timeout=5000)
     check("admin shows the server's answer", page.locator("form p").inner_text().strip() != "")
 
-    # Website: the enquiry form posts to the PHP API and confirms
+    # Website: sending the enquiry opens WhatsApp and copies it to the PHP API
+    # (WhatsApp is stubbed out; only the link it is opened with matters here)
+    page.context.route("https://wa.me/**", lambda r: r.fulfill(status=200, body="WhatsApp (test stub)"))
     page.goto(BASE + "/")
     page.wait_for_load_state("networkidle")
     page.fill("#enq-name", "Browser Test")
@@ -156,12 +158,13 @@ with sync_playwright() as p:
     page.select_option("#enq-stay", "A room")
     page.fill("#enq-in", enquiry["checkIn"])
     page.fill("#enq-out", enquiry["checkOut"])
-    with page.expect_response(lambda r: r.url.endswith("/api/enquiry")) as resp_info:
+    with page.expect_popup() as popup_info, page.expect_response(lambda r: r.url.endswith("/api/enquiry")) as resp_info:
         page.click("[data-testid=enquiry-form] button[type=submit]")
-    check("website form posts to /api/enquiry", resp_info.value.status == 200, f"status={resp_info.value.status}")
-    page.wait_for_selector(".form-status", timeout=5000)
+    check("website form copies the enquiry to /api/enquiry", resp_info.value.status == 200, f"status={resp_info.value.status}")
+    check("website form opens WhatsApp to the booking number", popup_info.value.url.startswith("https://wa.me/919074424142?text="), popup_info.value.url[:60])
+    popup_info.value.close()
     msg = page.locator(".form-status").inner_text()
-    check("website form shows confirmation", msg.startswith("Enquiry sent"), msg)
+    check("website form confirms WhatsApp opened", "WhatsApp has opened" in msg, msg)
     page.locator("#enquire").screenshot(path=os.path.join(OUT, "website-enquiry-sent.png"))
 
     check("no page errors", not errors, "; ".join(errors)[:300])

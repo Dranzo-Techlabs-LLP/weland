@@ -5,12 +5,13 @@ Run with the dev server already up on port 3050:
     python tests/test_site.py
 
 Checks that the page renders, that the "Check availability" CTA scrolls to the
-enquiry form and pre-fills it, that the enquiry form submits through the API,
+enquiry form and pre-fills it, that the enquiry form opens WhatsApp with the details (and copies them to the API),
 and that the mobile layout has no horizontal overflow. Screenshots are saved
 under tests/screenshots/.
 """
 
 import os
+import urllib.parse
 import sys
 from datetime import date, timedelta
 
@@ -112,12 +113,52 @@ with sync_playwright() as p:
     check("check-in 3 pm, check-out 12 noon (facts and footer)",
           all("3:00 pm" in t and "12:00 noon" in t for t in (contact["facts"], contact["footer"])), contact["footer"][-45:])
     check("no dining section or link", page.locator("#dining").count() == 0 and page.locator('a[href="#dining"]').count() == 0)
-    check("gallery: 13 photos, the new aerial featured",
-          page.locator(".gallery-item").count() == 13
-          and page.locator('.gallery-item.is-feature img[src="/images/resort-dusk-mist.jpg"]').count() == 1
-          and page.locator('.gallery-item img[src="/images/deck-dinner-sunset.jpg"]').count() == 1)
-    srcs = page.evaluate("[...document.querySelectorAll('.gallery-item img')].map(i => i.getAttribute('src'))")
+    check("gallery: 15 photos, the new aerial featured first",
+          page.locator(".gallery-tile").count() == 15
+          and page.locator('.gallery-tile.is-feature img[src="/images/resort-dusk-mist.jpg"]').count() == 1)
+    srcs = page.evaluate("[...document.querySelectorAll('.gallery-tile img')].map(i => i.getAttribute('src'))")
     check("gallery: no photo shown twice", len(srcs) == len(set(srcs)), f"{len(srcs)} tiles, {len(set(srcs))} different")
+    shapes = page.evaluate("""[...document.querySelectorAll('.gallery-tile')].map(t => {
+      const i = t.querySelector('img');
+      return Math.abs(t.offsetWidth / t.offsetHeight - i.naturalWidth / i.naturalHeight) / (i.naturalWidth / i.naturalHeight);
+    })""")
+    check("gallery: every photo shown whole (tile has the photo's shape)", max(shapes) < 0.03, f"worst {max(shapes):.3f}")
+
+    # ---------- rooms, dormitory, contacts ----------
+    stay = page.evaluate("""(() => ({
+      counts: [...document.querySelectorAll('.stay-count')].map(e => e.innerText.replace(/\\s+/g, ' ').trim()),
+      dorm: document.querySelector('#dormitory .stay-specs').innerText,
+      units: [...document.querySelectorAll('.unit-name')].map(e => e.textContent),
+      mail: [...document.querySelectorAll('a[href^="mailto:"]')].map(a => a.getAttribute('href')),
+      insta: [...document.querySelectorAll('a[href*="instagram.com"]')].map(a => a.getAttribute('href')),
+    }))()""")
+    check("rooms: A1 to A4, then B1 and B2", stay["units"] == ["Room A1", "Room A2", "Room A3", "Room A4", "Room B1", "Room B2"], str(stay["units"]))
+    check("rooms marked Non-AC, dormitory AC", stay["counts"] == ["6 rooms Non-AC", "1 dormitory block AC"], str(stay["counts"]))
+    check("dormitory: 16 bunk beds", "16 bunk beds" in stay["dorm"])
+    check("email is the resort's Gmail", stay["mail"] == ["mailto:welandresort0072@gmail.com"], str(stay["mail"]))
+    check("Instagram linked in the enquiry section and footer", stay["insta"] == ["https://www.instagram.com/weland.resort/", "https://www.instagram.com/weland.resort/"], str(stay["insta"]))
+
+    # ---------- every photo opens full screen, as a slideshow ----------
+    page.evaluate("document.getElementById('gallery').scrollIntoView()")
+    page.wait_for_timeout(600)
+    page.locator(".gallery-tile").nth(2).click()
+    page.wait_for_selector(".yarl__root .yarl__counter", timeout=20000)
+    first = page.inner_text(".yarl__counter").replace(" ", "")
+    page.keyboard.press("ArrowRight")
+    page.wait_for_timeout(700)
+    second = page.inner_text(".yarl__counter").replace(" ", "")
+    shot(page, "slideshow.png")
+    page.keyboard.press("Escape")
+    page.wait_for_timeout(800)
+    check("gallery photo opens as a slideshow (arrow keys move on)", first == "3/15" and second == "4/15", f"{first} -> {second}")
+    check("slideshow closes with Esc", page.locator(".yarl__root").count() == 0)
+    page.locator(".unit .photo-open").nth(5).click()
+    page.wait_for_selector(".yarl__root .yarl__counter", timeout=20000)
+    room = page.inner_text(".yarl__counter").replace(" ", "")
+    page.keyboard.press("Escape")
+    page.wait_for_timeout(800)
+    check("room photos open in the rooms' own slideshow", room == "10/10", room)
+    check("every photo on the page can be opened", page.locator(".photo-open").count() >= 30, str(page.locator(".photo-open").count()))
     # next/font self-hosts under hashed family names (e.g. __Cormorant_Garamond_ab12cd),
     # so look through the loaded FontFace entries rather than document.fonts.check().
     fonts_ok = page.evaluate(
@@ -145,19 +186,27 @@ with sync_playwright() as p:
     check("CTA moved focus to the name field", page.evaluate("document.activeElement && document.activeElement.id") == "enq-name")
     shot(page, "cta-after-click.png")
 
-    # ---------- enquiry form submits through /api/enquiry ----------
+    # ---------- sending the enquiry opens WhatsApp, with a copy to /api/enquiry ----------
+    # (WhatsApp itself is stubbed out: the test only reads the link it was opened with)
+    page.context.route("https://wa.me/**", lambda r: r.fulfill(status=200, body="WhatsApp (test stub)"))
     page.fill("#enq-name", "Test Guest")
     page.fill("#enq-phone", "+91 98765 43210")
     page.fill("#enq-email", "test@example.com")
     page.select_option("#enq-stay", "The dormitory")
+    page.select_option("#enq-guests", "16")
     page.fill("#enq-notes", "Automated smoke test, please ignore.")
-    with page.expect_response(lambda r: "/api/enquiry" in r.url) as resp_info:
+    with page.expect_popup() as popup_info, page.expect_response(lambda r: "/api/enquiry" in r.url) as resp_info:
         page.click("[data-testid=enquiry-form] button[type=submit]")
-    resp = resp_info.value
-    check("API /api/enquiry responded 200", resp.status == 200, f"status={resp.status}")
-    page.wait_for_selector(".form-status", timeout=5000)
+    wa = popup_info.value.url
+    text = urllib.parse.parse_qs(urllib.parse.urlparse(wa).query).get("text", [""])[0]
+    check("send opens WhatsApp to the booking number", wa.startswith("https://wa.me/919074424142?text="), wa[:60])
+    check("the WhatsApp message carries every detail",
+          all(s in text for s in ("Test Guest", "+91 98765 43210", "test@example.com", "The dormitory", "*Guests:* 16", "(3 nights)", "Automated smoke test")),
+          text.replace("\n", " | ")[:220])
+    check("a copy reaches /api/enquiry", resp_info.value.status == 200, f"status={resp_info.value.status}")
     status_text = page.locator(".form-status").inner_text()
-    check("form shows confirmation", status_text.startswith("Enquiry sent"), status_text)
+    check("form confirms WhatsApp opened", "WhatsApp has opened" in status_text, status_text)
+    popup_info.value.close()
     shot(page, "form-sent.png")
 
     # ---------- nav "Reserve a stay" CTA ----------

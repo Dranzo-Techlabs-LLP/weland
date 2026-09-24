@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Menu, X } from "lucide-react";
 import { nav, site } from "@/lib/content";
+import InstagramIcon from "./InstagramIcon";
 import WhatsAppIcon from "./WhatsAppIcon";
 
 export default function Navbar() {
@@ -94,6 +95,10 @@ export default function Navbar() {
             <a href={site.whatsappHref} className="menu-wa" target="_blank" rel="noreferrer">
               <WhatsAppIcon size={18} className="wa-green" />
               WhatsApp us
+            </a>
+            <a href={site.instagram.href} className="menu-wa" target="_blank" rel="noreferrer">
+              <InstagramIcon size={18} />
+              {site.instagram.handle} on Instagram
             </a>
           </div>
         </div>
