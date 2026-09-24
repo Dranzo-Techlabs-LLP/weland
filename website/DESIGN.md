@@ -43,7 +43,7 @@ right, and a reservation strip docked beneath both. That strip is the
 primary CTA.
 
 ```
-| (W) We Land   Stays  Conference hall  Dining  …       [Reserve a stay]  |
+| (W) We Land   Stays  Conference hall  Gallery  …      [Reserve a stay]  |
 |------------------------------------|-----------------------------------|
 |  [ logo badge ]                    |                                   |
 |  A hilltop in Kakkadampoyil,       |        hero photo panel           |
@@ -56,7 +56,7 @@ primary CTA.
 | Above the mist — pinned aerial photo; scroll sinks the morning cloud    |
 | Stays — rooms band (+ room-by-room grid), dormitory band                |
 | Conference hall — text + facts, main photo + three details              |
-| Dining · Gallery (dense 4-col) · Getting here (map + route table)       |
+| Gallery (featured 2x2, even tiles) · Getting here (map + route table)   |
 | Enquire — wine panel, gold accents, form pre-filled from the strip      |
 | Footer                                                                   |
 ```

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Menu, X } from "lucide-react";
 import { nav, site } from "@/lib/content";
+import WhatsAppIcon from "./WhatsAppIcon";
 
 export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
@@ -89,7 +90,11 @@ export default function Navbar() {
             <a href="#enquire" className="btn btn-paper" onClick={() => setOpen(false)}>
               Reserve a stay
             </a>
-            <a href={site.phoneHref}>{site.phone}</a>
+            <a href={site.phoneHref}>Call {site.phone}</a>
+            <a href={site.whatsappHref} className="menu-wa" target="_blank" rel="noreferrer">
+              <WhatsAppIcon size={18} className="wa-green" />
+              WhatsApp us
+            </a>
           </div>
         </div>
       )}

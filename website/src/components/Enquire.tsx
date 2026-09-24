@@ -1,5 +1,6 @@
-import { Mail, MessageCircle, Phone } from "lucide-react";
+import { Mail, Phone } from "lucide-react";
 import EnquiryForm from "./EnquiryForm";
+import WhatsAppIcon from "./WhatsAppIcon";
 import { site } from "@/lib/content";
 
 export default function Enquire() {
@@ -19,13 +20,19 @@ export default function Enquire() {
             <li>
               <a className="contact-link" href={site.phoneHref}>
                 <Phone size={18} aria-hidden="true" />
-                <span>{site.phone}</span>
+                <span>
+                  {site.phone}
+                  <small>Bookings and enquiries</small>
+                </span>
               </a>
             </li>
             <li>
-              <a className="contact-link" href={`https://wa.me/${site.whatsapp}`} target="_blank" rel="noreferrer">
-                <MessageCircle size={18} aria-hidden="true" />
-                <span>Message us on WhatsApp</span>
+              <a className="contact-link" href={site.whatsappHref} target="_blank" rel="noreferrer">
+                <WhatsAppIcon size={20} className="wa-green" />
+                <span>
+                  Message us on WhatsApp
+                  <small>{site.phone}</small>
+                </span>
               </a>
             </li>
             <li>

@@ -11,28 +11,28 @@ export const site = {
   tagline: "A hilltop in Kakkadampoyil, above the mist.",
   description:
     "We Land Resort sits on a ridge in Kakkadampoyil with an infinity pool facing the mountains, a sky deck that walks out over the valley, six rooms, a dormitory for groups, and a hall for meetings and celebrations.",
-  phone: "+91 00000 00000", // PLACEHOLDER
-  phoneHref: "tel:+910000000000", // PLACEHOLDER
-  whatsapp: process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "910000000000", // PLACEHOLDER
+  // Bookings and enquiries; the same number takes WhatsApp messages.
+  phone: "+91 90744 24142",
+  phoneHref: "tel:+919074424142",
+  whatsappHref: `https://wa.me/919074424142?text=${encodeURIComponent("Hello! I'd like to ask about a stay at We Land Resort.")}`,
   email: "hello@welandresort.com", // PLACEHOLDER
-  address: ["We Land Resort", "Kakkadampoyil", "Kozhikode district, Kerala"],
-  // PLACEHOLDER — swap for the resort's own Google Maps share link once you have it.
-  mapsHref: "https://www.google.com/maps/search/?api=1&query=Kakkadampoyil",
-  mapEmbed: "https://maps.google.com/maps?q=Kakkadampoyil,Kozhikode,Kerala&z=13&output=embed",
-  checkIn: "2:00 pm",
-  checkOut: "11:00 am",
+  // As on the resort's Google Maps listing.
+  address: ["We Land Resort", "Foggy Mountain, Park Road", "Kakkadampoyil, Kozhikode, Kerala 673604"],
+  mapsHref: "https://maps.app.goo.gl/sK3fXUWg9pns3AEaA",
+  // By the listing's name: it pins the resort (11.3337, 76.1173) with its place card.
+  mapEmbed: "https://maps.google.com/maps?q=Weland+Kakkadampoyil+Resort,+Kakkadampoyil,+Kerala+673604&z=15&output=embed",
+  checkIn: "3:00 pm",
+  checkOut: "12:00 noon",
 };
 
 export const images = {
   hero: { src: "/images/hero-sunset-deck.jpg", alt: "The We Land Resort sky deck and infinity pool at sunset, mountains fading into mist behind" },
   building: { src: "/images/building-day.jpg", alt: "The terracotta main building with its rooftop terrace and glass-fronted ground floor" },
-  dining: { src: "/images/deck-dinner-sunset.jpg", alt: "A table set at the end of the sky deck at sunset, hills in every direction" },
 };
 
 export const nav = [
   { label: "Stays", href: "#stays" },
   { label: "Conference hall", href: "#conference" },
-  { label: "Dining", href: "#dining" },
   { label: "Gallery", href: "#gallery" },
   { label: "Getting here", href: "#location" },
 ];
@@ -148,32 +148,31 @@ export const mist = {
   label: "We Land Resort",
 };
 
-export const dining = {
-  title: "Cooked here, from close by.",
-  text: "The kitchen cooks Kerala food from what the Thiruvambady market has that week: meals on banana leaf at lunch, grills on the terrace at night, and a breakfast that changes daily. Tell us about allergies and preferences when you book and the kitchen will plan around them.",
-  notes: ["Vegetarian and vegan menus daily", "Children's portions", "Private dinner at the end of the sky deck, on request"],
-};
-
 export interface GalleryItem {
   caption: string;
   image: { src: string; alt: string } | null;
-  wide?: boolean;
-  tall?: boolean;
+  /** The big tile at the start of the gallery, shown with its caption */
+  feature?: boolean;
+  /** Which part of the photo to keep when the tile crops it (CSS object-position) */
+  focus?: string;
 }
 
-// Laid out on a 4-column grid; wide = 2 columns, tall = 2 rows.
+// The first photo is featured. All the others share one tile size, so every
+// row comes out full on any screen: twelve tiles fill 4, 3 or 2 columns.
 export const gallery: GalleryItem[] = [
-  { caption: "The pool at sunset", image: { src: "/images/pool-sunset.jpg", alt: "The infinity pool at sunset with the sun setting behind the mountains" }, wide: true },
-  { caption: "The sky deck in mist", image: { src: "/images/sky-deck-mist.jpg", alt: "The red-roofed sky deck gateway leading out into the mist" }, tall: true },
+  { caption: "We Land at dusk, above the mist", image: { src: "/images/resort-dusk-mist.jpg", alt: "Aerial view of We Land Resort at dusk: the lit main building, the pool and the garden paths on the forested hilltop, with mist lying over the hills behind" }, feature: true, focus: "55% 62%" },
+  { caption: "The pool at sunset", image: { src: "/images/pool-sunset.jpg", alt: "The infinity pool at sunset with the sun setting behind the mountains" } },
+  { caption: "The sky deck in mist", image: { src: "/images/sky-deck-mist.jpg", alt: "The red-roofed sky deck gateway leading out into the mist" }, focus: "50% 35%" },
+  { caption: "Dinner on the sky deck", image: { src: "/images/deck-dinner-sunset.jpg", alt: "A table set at the end of the sky deck at sunset, hills in every direction" } },
+  { caption: "The building at dusk", image: { src: "/images/building-dusk.jpg", alt: "The main building lit up at dusk with string lights along the terrace" } },
   { caption: "Play area", image: { src: "/images/play-area.jpg", alt: "Swings and a slide on the paved terrace with hills behind" } },
   { caption: "Campfire", image: { src: "/images/campfire-night.jpg", alt: "Guests around a campfire at night under strings of lights" } },
-  { caption: "Pool and slide by day", image: { src: "/images/pool-slide-day.jpg", alt: "The pool, the sky deck gateway and a children's slide on a cloudy afternoon" }, wide: true },
-  { caption: "Garden path", image: { src: "/images/garden-path.jpg", alt: "A railed path winding down the hillside garden past a rock face" }, tall: true },
-  { caption: "The building at dusk", image: { src: "/images/building-dusk.jpg", alt: "The main building lit up at dusk with string lights along the terrace" } },
+  { caption: "Pool and slide by day", image: { src: "/images/pool-slide-day.jpg", alt: "The pool, the sky deck gateway and a children's slide on a cloudy afternoon" } },
+  { caption: "Garden path", image: { src: "/images/garden-path.jpg", alt: "A railed path winding down the hillside garden past a rock face" } },
   { caption: "Stairways at night", image: { src: "/images/stairs-night.jpg", alt: "Lit stairways through the garden at night" } },
   { caption: "Mural and swings", image: { src: "/images/mural-swing.jpg", alt: "A carved mural wall with a ship sculpture beside a nest swing and a bench swing" } },
   { caption: "Mist over the forest", image: { src: "/images/aerial-mist.jpg", alt: "Aerial view of cloud rolling over the forested hills around the resort" } },
-  { caption: "Evening at the pool", image: { src: "/images/pool-sunset-tall.jpg", alt: "The pool reflecting an orange evening sky" }, tall: true },
+  { caption: "Evening at the pool", image: { src: "/images/pool-sunset-tall.jpg", alt: "The pool reflecting an orange evening sky" } },
 ];
 
 // Travel times as published for Kakkadampoyil by road.

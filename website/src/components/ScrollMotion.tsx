@@ -54,7 +54,7 @@ function heroDepth(finePointer: boolean): Cleanup {
 }
 
 function photosSettle(wide: boolean) {
-  const frames = gsap.utils.toArray<HTMLElement>(".stay-main, .conference-main, .dining-media");
+  const frames = gsap.utils.toArray<HTMLElement>(".stay-main, .conference-main");
   for (const frame of frames) {
     gsap.fromTo(
       frame,

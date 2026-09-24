@@ -1,16 +1,18 @@
-import { MessageCircle } from "lucide-react";
+import WhatsAppIcon from "./WhatsAppIcon";
 import { site } from "@/lib/content";
 
 export default function WhatsAppFloat() {
   return (
     <a
-      href={`https://wa.me/${site.whatsapp}`}
+      href={site.whatsappHref}
       target="_blank"
       rel="noreferrer"
       className="wa"
       aria-label={`Message ${site.name} on WhatsApp`}
     >
-      <MessageCircle size={20} aria-hidden="true" />
+      <span className="wa-icon">
+        <WhatsAppIcon size={20} />
+      </span>
       <span className="wa-label">WhatsApp</span>
     </a>
   );

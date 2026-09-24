@@ -67,7 +67,7 @@ with sync_playwright() as p:
         "[...document.querySelectorAll('link[rel~=\"icon\"], link[rel=\"apple-touch-icon\"]')].map(l => l.getAttribute('href'))"
     )
     check("favicon links emitted", len(icons) >= 2, ", ".join(icons))
-    for sid in ["above-the-mist", "stays", "conference", "dining", "gallery", "location", "enquire"]:
+    for sid in ["above-the-mist", "stays", "conference", "gallery", "location", "enquire"]:
         check(f"section #{sid} rendered", page.locator(f"#{sid}").count() == 1)
     check("two stay types listed (rooms, dormitory)", page.locator("article.stay").count() == 2)
     check("six rooms listed", page.locator(".unit").count() == 6)
@@ -91,6 +91,31 @@ with sync_playwright() as p:
     hero_loaded = page.evaluate("(() => { const i = document.querySelector('.hero-media img'); return !!i && i.naturalWidth > 0; })()")
     check("hero photo loaded", hero_loaded)
     check("map embed present", page.locator(".map iframe").count() == 1)
+
+    # ---------- contact details, times and location ----------
+    contact = page.evaluate("""(() => ({
+      tel: [...new Set([...document.querySelectorAll('a[href^="tel:"]')].map(a => a.getAttribute('href')))],
+      wa: [...new Set([...document.querySelectorAll('a[href*="wa.me"]')].map(a => a.getAttribute('href').split('?')[0]))],
+      maps: [...document.querySelectorAll('a[href*="maps"]')].map(a => a.getAttribute('href')),
+      embed: document.querySelector('.map iframe').getAttribute('src'),
+      facts: document.querySelector('.about-facts').innerText,
+      footer: document.querySelector('.footer-small').innerText,
+      waGreen: getComputedStyle(document.querySelector('.wa .wa-icon')).backgroundColor,
+    }))()""")
+    check("booking number is the call link", contact["tel"] == ["tel:+919074424142"], str(contact["tel"]))
+    check("WhatsApp links go to the booking number", contact["wa"] == ["https://wa.me/919074424142"], str(contact["wa"]))
+    check("booking number shown in the enquiry section", "+91 90744 24142" in page.locator(".contact-list").inner_text())
+    check("WhatsApp button in WhatsApp green", contact["waGreen"] == "rgb(37, 211, 102)", contact["waGreen"])
+    check("Google Maps link is the resort's listing", contact["maps"] == ["https://maps.app.goo.gl/sK3fXUWg9pns3AEaA"], str(contact["maps"]))
+    check("map pins the resort", "Weland+Kakkadampoyil+Resort" in contact["embed"], contact["embed"][:90])
+    check("address from the listing", "Foggy Mountain, Park Road" in page.locator(".address").inner_text())
+    check("check-in 3 pm, check-out 12 noon (facts and footer)",
+          all("3:00 pm" in t and "12:00 noon" in t for t in (contact["facts"], contact["footer"])), contact["footer"][-45:])
+    check("no dining section or link", page.locator("#dining").count() == 0 and page.locator('a[href="#dining"]').count() == 0)
+    check("gallery: 13 photos, the new aerial featured",
+          page.locator(".gallery-item").count() == 13
+          and page.locator('.gallery-item.is-feature img[src="/images/resort-dusk-mist.jpg"]').count() == 1
+          and page.locator('.gallery-item img[src="/images/deck-dinner-sunset.jpg"]').count() == 1)
     # next/font self-hosts under hashed family names (e.g. __Cormorant_Garamond_ab12cd),
     # so look through the loaded FontFace entries rather than document.fonts.check().
     fonts_ok = page.evaluate(

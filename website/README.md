@@ -9,8 +9,8 @@ beside the admin app (`/admin`) and the PHP API (`/api`). See the root README
 for the URL map and deployment.
 
 Sections: split hero with booking strip → about → above the mist → stays (six
-rooms, dormitory) → conference hall → dining → gallery → getting here →
-enquiry form → footer, plus a WhatsApp link.
+rooms, dormitory) → conference hall → gallery → getting here → enquiry form →
+footer, plus a WhatsApp button.
 
 "Above the mist" is the one big motion moment. As you scroll, the morning cloud
 over the aerial photo sinks into the valley and the resort comes up through it.
@@ -53,7 +53,7 @@ Everything editable is in `src/lib/content.ts`. Photos are pre-sized web copies
 
 | Source folder | Used for |
 |---------------|----------|
-| `GEN`  | hero (sky deck at sunset), above the mist (aerial), dining (deck table), gallery (11 photos) |
+| `GEN`  | hero (sky deck at sunset), above the mist (aerial), gallery (12 photos, incl. the deck table) |
 | `A1`–`A6` | "The Rooms" band and the room-by-room grid (one photo per room) |
 | `DOM`  | "The Dormitory" band (bunks, exterior, deck at dusk, washrooms) |
 | `HALL` | conference hall (wide shot, stage wall, carrom/seating, washrooms) |
@@ -61,8 +61,14 @@ Everything editable is in `src/lib/content.ts`. Photos are pre-sized web copies
 The logo badge, the W-monogram emblem and the favicons (`src/app/icon.png`,
 `apple-icon.png`, `favicon.ico`) were generated from the resort's logo.
 
-Still marked **PLACEHOLDER** in `content.ts`: phone, WhatsApp number, email,
-the resort's own Google Maps link and pin, all rates, the dormitory bed count,
+The featured gallery photo (`resort-dusk-mist.jpg`, the resort from the air at
+dusk) was supplied separately.
+
+Contact details in `content.ts`: bookings and WhatsApp on +91 90744 24142,
+check-in 3:00 pm, check-out 12:00 noon, and the address, map and "Open in
+Google Maps" link from the resort's Google Maps listing.
+
+Still marked **PLACEHOLDER** in `content.ts`: email, all rates, the dormitory bed count,
 the hall seat count and projector availability. The room-by-room notes were
 written from the photos and should be checked by the resort.
 

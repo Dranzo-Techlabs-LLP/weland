@@ -64,6 +64,19 @@ def overflow(page):
     return js(page, "document.documentElement.scrollWidth - document.documentElement.clientWidth")
 
 
+def gallery_rows_full(page):
+    """Every column of the gallery ends at the same line (no gaps, no ragged end).
+    Uses layout boxes, so tiles still waiting to be revealed don't skew it."""
+    return js(page, """(() => {
+      const items = [...document.querySelectorAll('.gallery-item')].map(e => ({ left: e.offsetLeft, bottom: e.offsetTop + e.offsetHeight }));
+      const bottom = Math.max(...items.map(i => i.bottom));
+      const cols = {};
+      items.forEach(i => { cols[i.left] = Math.max(cols[i.left] || 0, i.bottom); });
+      const ends = Object.values(cols);
+      return { columns: ends.length, full: ends.every(b => Math.abs(b - bottom) <= 1) };
+    })()""")
+
+
 def detail(page, box):
     """How much fine detail a screen region has: fog is smooth, the photo is not."""
     shot = page.screenshot(clip=box)
@@ -132,6 +145,9 @@ with sync_playwright() as p:
     shown = js(page, "[...document.querySelectorAll('.gallery-item')].slice(0, 4).every(e => +getComputedStyle(e).opacity > 0.95)")
     check("gallery tiles wait below the fold, then reveal", hidden > 0 and shown, f"{hidden} waiting")
 
+    rows = gallery_rows_full(page)
+    check("desktop: gallery rows are all full", rows["full"] and rows["columns"] == 4, str(rows))
+
     check("no page errors (desktop)", not page.errors, "; ".join(page.errors)[:300])
     page.context.close()
 
@@ -143,6 +159,8 @@ with sync_playwright() as p:
     rooms = js(phone, "(() => { const g = document.querySelector('.units-grid'); return { scroll: g.scrollWidth > g.clientWidth + 100, snap: getComputedStyle(g).scrollSnapType }; })()")
     check("phone: rooms become a swipeable row", rooms["scroll"] and "x" in rooms["snap"], str(rooms))
     check("phone: WhatsApp button is icon-only", js(phone, "document.querySelector('.wa').getBoundingClientRect().width") <= 56)
+    rows = gallery_rows_full(phone)
+    check("phone: gallery rows are all full", rows["full"] and rows["columns"] == 2, str(rows))
     phone.screenshot(path=os.path.join(OUT, "layout-phone.png"))
     check("no page errors (phone)", not phone.errors, "; ".join(phone.errors)[:300])
     phone.context.close()
@@ -154,6 +172,8 @@ with sync_playwright() as p:
     land = open_page(browser, 844, 390, touch=True)
     cols = js(land, "getComputedStyle(document.querySelector('.hero')).gridTemplateColumns.split(' ').length")
     check("landscape phone: hero side by side", cols == 2 and overflow(land) <= 0, f"{cols} columns")
+    rows = gallery_rows_full(land)
+    check("landscape phone: gallery rows are all full", rows["full"] and rows["columns"] == 3, str(rows))
     land.screenshot(path=os.path.join(OUT, "layout-landscape.png"))
     land.context.close()
 

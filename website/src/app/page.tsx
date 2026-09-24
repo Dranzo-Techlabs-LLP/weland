@@ -4,7 +4,6 @@ import About from "@/components/About";
 import MistSection from "@/components/mist/MistSection";
 import Stays from "@/components/Stays";
 import Conference from "@/components/Conference";
-import Dining from "@/components/Dining";
 import Gallery from "@/components/Gallery";
 import Location from "@/components/Location";
 import Enquire from "@/components/Enquire";
@@ -21,7 +20,6 @@ export default function Home() {
         <MistSection />
         <Stays />
         <Conference />
-        <Dining />
         <Gallery />
         <Location />
         <Enquire />

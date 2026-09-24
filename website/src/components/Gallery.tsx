@@ -13,15 +13,13 @@ export default function Gallery() {
       </div>
       <ul className="gallery-grid">
         {gallery.map((item) => (
-          <li
-            key={item.caption}
-            className={`gallery-item${item.wide ? " is-wide" : ""}${item.tall ? " is-tall" : ""}`}
-          >
+          <li key={item.caption} className={`gallery-item${item.feature ? " is-feature" : ""}`}>
             {item.image ? (
-              <Photo src={item.image.src} alt={item.image.alt} />
+              <Photo src={item.image.src} alt={item.image.alt} position={item.focus} />
             ) : (
               <Placeholder caption={`Photo: ${item.caption}`} seed={`gallery-${item.caption}`} />
             )}
+            {item.feature && <p className="gallery-caption">{item.caption}</p>}
           </li>
         ))}
       </ul>

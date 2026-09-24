@@ -43,7 +43,7 @@ export default function Location() {
         </div>
         <div className="map">
           <iframe
-            title="Map of Kakkadampoyil"
+            title="Map: We Land Resort, Foggy Mountain, Kakkadampoyil"
             src={site.mapEmbed}
             loading="lazy"
             referrerPolicy="no-referrer-when-downgrade"
