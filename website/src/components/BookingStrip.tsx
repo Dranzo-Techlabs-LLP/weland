@@ -13,11 +13,13 @@ export const PREFILL_EVENT = "weland:prefill";
 /** Guest counts to choose from: enough for the whole dormitory (16) and more. */
 export const GUEST_OPTIONS = Array.from({ length: 30 }, (_, i) => i + 1);
 
+/** "2026-11-05" plus days, as a calendar date (read and written in local time,
+ *  so it doesn't slip back a day east of UTC, as toISOString would in India). */
 function addDays(iso: string, days: number) {
   if (!iso) return "";
   const d = new Date(iso + "T00:00:00");
   d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
 export default function BookingStrip() {

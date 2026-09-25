@@ -235,9 +235,11 @@ ol {
   cursor: zoom-in;
 }
 
+/* drawn above the photo (and the feature's caption): the hover shade and the focus ring */
 .photo-open::after {
   content: "";
   position: absolute;
+  z-index: 2;
   inset: 0;
   background: rgba(42, 29, 33, 0);
   transition: background-color 0.3s var(--ease);
@@ -250,8 +252,13 @@ ol {
   }
 }
 
-/* the frames clip their edges, so the focus ring sits just inside the photo */
+/* the frames clip their edges and the photo covers the button, so the focus
+   ring is drawn on the layer above, just inside the photo */
 .photo-open:focus-visible {
+  outline: none;
+}
+
+.photo-open:focus-visible::after {
   outline: 2px solid var(--paper);
   outline-offset: -6px;
   box-shadow: inset 0 0 0 3px var(--wine);
@@ -1206,6 +1213,30 @@ ol {
 .gallery-rows {
   position: relative;
   container-type: inline-size;
+}
+
+/* GalleryRows sends a layout for phones, tablets and desktops: show the one
+   that fits the container */
+.gallery-band {
+  display: none;
+}
+
+@container (max-width: 599.98px) {
+  .gallery-band-s {
+    display: block;
+  }
+}
+
+@container (min-width: 600px) and (max-width: 899.98px) {
+  .gallery-band-m {
+    display: block;
+  }
+}
+
+@container (min-width: 900px) {
+  .gallery-band-l {
+    display: block;
+  }
 }
 
 .gallery-row {

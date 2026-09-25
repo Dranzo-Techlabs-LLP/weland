@@ -30,7 +30,7 @@ export default function LightboxViewer({
       plugins={[Captions, Counter, Zoom]}
       carousel={{ finite: false, preload: 2 }}
       controller={{ closeOnBackdropClick: true, closeOnPullDown: true }}
-      captions={{ descriptionTextAlign: "center", descriptionMaxLines: 3 }}
+      captions={{ descriptionTextAlign: "center", descriptionMaxLines: 5 }}
       zoom={{ maxZoomPixelRatio: 2 }}
       className="photo-viewer"
     />

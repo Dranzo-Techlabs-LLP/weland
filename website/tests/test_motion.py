@@ -45,9 +45,10 @@ def open_page(browser, width, height, touch=False, **kw):
         " window.__fogAt = performance.now(); }).observe(document, { childList: true, subtree: true });"
     )
     page = ctx.new_page()
-    # Headless Chromium draws the fog on the CPU; on a busy machine a screenshot
-    # can wait a long time for a frame, so allow more than the 30 s default.
-    page.set_default_timeout(90000)
+    # Headless Chromium draws the fog on the CPU (SwiftShader), and while the fog
+    # canvas exists every screenshot waits on it: measured up to ~2 minutes on a
+    # busy machine. Allow plenty more than the 30 s default.
+    page.set_default_timeout(240000)
     page.errors = []
     page.on("pageerror", lambda e: page.errors.append(str(e)))
     page.goto(BASE, wait_until="networkidle")
@@ -86,7 +87,7 @@ def gallery_rows_full(page):
     return js(page, """(() => {
       const box = document.querySelector('.gallery-rows');
       const W = box.clientWidth;
-      const rows = [...document.querySelectorAll('.gallery-row')].map(r => {
+      const rows = [...document.querySelectorAll('.gallery-row')].filter(r => r.offsetParent).map(r => {
         const t = [...r.children];
         const last = t[t.length - 1];
         return { left: t[0].offsetLeft, right: W - (last.offsetLeft + last.offsetWidth), heights: new Set(t.map(x => x.offsetHeight)).size };
@@ -163,10 +164,10 @@ with sync_playwright() as p:
     check("room photo ends flat", near_identity(flat), flat[:60])
 
     gallery = top_of(page, ".gallery-rows")
-    hidden = js(page, "[...document.querySelectorAll('.gallery-tile')].filter(e => +getComputedStyle(e).opacity < 0.5).length")
+    hidden = js(page, "[...document.querySelectorAll('.gallery-tile')].filter(e => e.offsetParent && +getComputedStyle(e).opacity < 0.5).length")
     page.evaluate(f"scrollTo(0, {gallery - 400})"); page.wait_for_timeout(1800)
     # the tiles now on screen (whatever the row heights) have all come in
-    shown = js(page, "(() => { const on = [...document.querySelectorAll('.gallery-tile')].filter(e => e.getBoundingClientRect().top < innerHeight * 0.75);"
+    shown = js(page, "(() => { const on = [...document.querySelectorAll('.gallery-tile')].filter(e => e.offsetParent && e.getBoundingClientRect().top < innerHeight * 0.75);"
                      " return on.length > 0 && on.every(e => +getComputedStyle(e).opacity > 0.95); })()")
     check("gallery tiles wait below the fold, then reveal", hidden > 0 and shown, f"{hidden} waiting")
 
@@ -186,6 +187,8 @@ with sync_playwright() as p:
     check("phone: WhatsApp button is icon-only", js(phone, "document.querySelector('.wa').getBoundingClientRect().width") <= 56)
     rows = gallery_rows_full(phone)
     check("phone: gallery rows run edge to edge", rows["full"], str(rows))
+    waiting = js(phone, "[...document.querySelectorAll('.gallery-tile')].filter(e => e.offsetParent && +getComputedStyle(e).opacity < 0.5).length")
+    check("phone: gallery photos reveal as you scroll too", waiting > 0, f"{waiting} waiting")
     phone.evaluate("scrollTo(0, document.documentElement.scrollHeight)"); phone.wait_for_timeout(600)
     clash = js(phone, "(() => { const a = document.querySelector('.wa').getBoundingClientRect(), b = document.querySelector('.footer-small').getBoundingClientRect();"
                       " return !(a.right <= b.left || a.left >= b.right || a.bottom <= b.top || a.top >= b.bottom); })()")
@@ -193,6 +196,15 @@ with sync_playwright() as p:
     phone.screenshot(path=os.path.join(OUT, "layout-phone.png"))
     check("no page errors (phone)", not phone.errors, "; ".join(phone.errors)[:300])
     phone.context.close()
+
+    # The HTML as first sent (before any script) already has the phone layout,
+    # so nothing jumps when the page comes to life.
+    bare = browser.new_context(viewport={"width": 390, "height": 844}, is_mobile=True, has_touch=True, java_script_enabled=False)
+    bp = bare.new_page()
+    bp.goto(BASE, wait_until="load")
+    first = bp.evaluate("(() => { const r = [...document.querySelectorAll('.gallery-row')].filter(r => r.offsetParent); return { rows: r.length, lead: r[0].children.length }; })()")
+    check("phone, before scripts: gallery already in the phone layout", first["lead"] == 1 and first["rows"] >= 6, str(first))
+    bare.close()
 
     fold = open_page(browser, 280, 653, touch=True)
     check("280px (folded phone): no horizontal overflow", overflow(fold) <= 0 and js(fold, "innerWidth") == 280, f"{overflow(fold)}px")

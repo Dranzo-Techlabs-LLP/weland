@@ -39,9 +39,9 @@ try {
   }
 
   // ---------- Public: enquiry form on the website ----------
-  //  The marketing site at "/" posts here; no session needed. Mails the resort
-  //  at ENQUIRY_TO_EMAIL (config.php). Guests are only told "sent" when the
-  //  mail was actually handed to the server; otherwise they're asked to call.
+  //  The marketing site at "/" sends enquiries on WhatsApp and posts a copy
+  //  here; no session needed. Mails the resort at ENQUIRY_TO_EMAIL (config.php),
+  //  or logs it. The site doesn't show guests this reply.
   if ($method === 'POST' && $path === 'enquiry') {
     $b = body();
 

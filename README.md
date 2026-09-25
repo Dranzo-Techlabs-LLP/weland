@@ -67,12 +67,13 @@ database). Staff sign in at **https://welandresort.com/admin**.
 
 ### Enquiry email
 
-`POST /api/enquiry` needs no session. It validates the form, drops submissions
-that fill the hidden honeypot field, and sends a plain-text email with PHP
-`mail()`, with the guest's address as Reply-To. Guests only see "Enquiry sent"
-if the mail was handed to the server; if `ENQUIRY_TO_EMAIL` is missing or
-`mail()` fails, they're asked to call or WhatsApp, and the enquiry is written to
-the PHP error log so it isn't lost. For local work, set
+Guests send the website's enquiry form on WhatsApp: it opens a chat with the
+booking number, the details written out. The site also posts a copy to
+`POST /api/enquiry` (no session needed), which validates it, drops submissions
+that fill the hidden honeypot field, and emails it with PHP `mail()` to
+`ENQUIRY_TO_EMAIL`, with the guest's address as Reply-To. If that isn't set or
+`mail()` fails, the copy is written to the PHP error log so it isn't lost. The
+guest sees the WhatsApp confirmation either way. For local work, set
 `const ENQUIRY_LOG_ONLY = true;` in your local `config.php` to log instead of
 mailing.
 

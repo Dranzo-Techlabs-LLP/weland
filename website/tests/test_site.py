@@ -79,12 +79,13 @@ with sync_playwright() as p:
         " for (let y = 0; y < h; y += 600) { window.scrollTo(0, y); await new Promise(r => setTimeout(r, 120)); } }"
     )
     page.wait_for_function(
-        "() => [...document.querySelectorAll('img[src^=\"/images/\"]')].every(i => i.complete)", timeout=20000
+        # (only images on screen: the gallery's layouts for other screen sizes are hidden and never load)
+        "() => [...document.querySelectorAll('img[src^=\"/images/\"]')].filter(i => i.offsetParent).every(i => i.complete)", timeout=20000
     )
     page.evaluate("window.scrollTo(0, 0)")
     page.wait_for_timeout(400)
     photos = page.evaluate(
-        "(() => { const imgs = [...document.querySelectorAll('img[src^=\"/images/\"]')];"
+        "(() => { const imgs = [...document.querySelectorAll('img[src^=\"/images/\"]')].filter(i => i.offsetParent);"
         " return { total: imgs.length, broken: imgs.filter(i => i.naturalWidth === 0).map(i => i.getAttribute('src')) }; })()"
     )
     check("resort photos placed", photos["total"] >= 30, f"{photos['total']} <img> tags")
@@ -114,11 +115,11 @@ with sync_playwright() as p:
           all("3:00 pm" in t and "12:00 noon" in t for t in (contact["facts"], contact["footer"])), contact["footer"][-45:])
     check("no dining section or link", page.locator("#dining").count() == 0 and page.locator('a[href="#dining"]').count() == 0)
     check("gallery: 15 photos, the new aerial featured first",
-          page.locator(".gallery-tile").count() == 15
-          and page.locator('.gallery-tile.is-feature img[src="/images/resort-dusk-mist.jpg"]').count() == 1)
-    srcs = page.evaluate("[...document.querySelectorAll('.gallery-tile img')].map(i => i.getAttribute('src'))")
+          page.locator(".gallery-tile:visible").count() == 15
+          and page.locator('.gallery-tile.is-feature:visible img[src="/images/resort-dusk-mist.jpg"]').count() == 1)
+    srcs = page.evaluate("[...document.querySelectorAll('.gallery-tile')].filter(t => t.offsetParent).map(t => t.querySelector('img').getAttribute('src'))")
     check("gallery: no photo shown twice", len(srcs) == len(set(srcs)), f"{len(srcs)} tiles, {len(set(srcs))} different")
-    shapes = page.evaluate("""[...document.querySelectorAll('.gallery-tile')].map(t => {
+    shapes = page.evaluate("""[...document.querySelectorAll('.gallery-tile')].filter(t => t.offsetParent).map(t => {
       const i = t.querySelector('img');
       return Math.abs(t.offsetWidth / t.offsetHeight - i.naturalWidth / i.naturalHeight) / (i.naturalWidth / i.naturalHeight);
     })""")
@@ -141,7 +142,7 @@ with sync_playwright() as p:
     # ---------- every photo opens full screen, as a slideshow ----------
     page.evaluate("document.getElementById('gallery').scrollIntoView()")
     page.wait_for_timeout(600)
-    page.locator(".gallery-tile").nth(2).click()
+    page.locator(".gallery-tile:visible").nth(2).click()
     page.wait_for_selector(".yarl__root .yarl__counter", timeout=20000)
     first = page.inner_text(".yarl__counter").replace(" ", "")
     page.keyboard.press("ArrowRight")
@@ -158,7 +159,22 @@ with sync_playwright() as p:
     page.keyboard.press("Escape")
     page.wait_for_timeout(800)
     check("room photos open in the rooms' own slideshow", room == "10/10", room)
-    check("every photo on the page can be opened", page.locator(".photo-open").count() >= 30, str(page.locator(".photo-open").count()))
+    check("every photo on the page can be opened", page.locator(".photo-open:visible").count() >= 30, str(page.locator(".photo-open:visible").count()))
+    # keyboard: the focus ring is drawn on the layer above the photo, so it shows
+    page.locator(".gallery-tile:visible").nth(3).focus()
+    page.keyboard.press("Shift+Tab")
+    page.keyboard.press("Tab")
+    ring = page.evaluate("(() => { const a = document.activeElement; const s = getComputedStyle(a, '::after');"
+                         " return { photo: a.classList.contains('photo-open'), ring: s.outlineStyle, layer: s.zIndex }; })()")
+    check("keyboard focus on a photo shows a ring above it", ring["photo"] and ring["ring"] == "solid" and ring["layer"] == "2", str(ring))
+
+    # India is UTC+5:30: the strip's next-day default must not slip back a day there
+    ist = browser.new_context(viewport={"width": 1440, "height": 900}, timezone_id="Asia/Kolkata")
+    ip = ist.new_page()
+    ip.goto(BASE, wait_until="networkidle")
+    ip.fill("#strip-in", "2026-11-05")
+    check("in Indian time, check-out can't be before the next day", ip.get_attribute("#strip-out", "min") == "2026-11-06", str(ip.get_attribute("#strip-out", "min")))
+    ist.close()
     # next/font self-hosts under hashed family names (e.g. __Cormorant_Garamond_ab12cd),
     # so look through the loaded FontFace entries rather than document.fonts.check().
     fonts_ok = page.evaluate(

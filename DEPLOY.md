@@ -61,13 +61,15 @@ Before: `public_html` holds the old admin build at its root
    one-time installer, and it can drop every table. `api/config.example.php`
    can go too. Keep `config.php`, `index.php`, `lib.php` and `.htaccess`.
 
-7. **Turn on enquiry emails.**
+7. **Turn on enquiry email copies** (optional). Guests send the enquiry form
+   on WhatsApp, to the booking number; the site also posts a copy to the API,
+   which can email it to you:
    - Open `api/config.php` → **Edit**. Below the line that starts with
      `const INSTALL_KEY`, add:
 
      ```php
-     const ENQUIRY_TO_EMAIL   = 'reservations@example.com';  // who receives website enquiries
-     const ENQUIRY_FROM_EMAIL = 'enquiry@welandresort.com';  // the sender mailbox below
+     const ENQUIRY_TO_EMAIL   = 'welandresort0072@gmail.com';  // who receives the copies
+     const ENQUIRY_FROM_EMAIL = 'enquiry@welandresort.com';    // the sender mailbox below
      ```
 
      Put in the real inbox, then **Save Changes**.
@@ -75,8 +77,8 @@ Before: `public_html` holds the old admin build at its root
    - cPanel → **Email Deliverability** → `welandresort.com` should show SPF and
      DKIM as valid (use **Repair** if not), so enquiries don't land in spam.
 
-   Until step 7 is done, the form tells guests to call or WhatsApp instead,
-   and each enquiry is written to `api/error_log`, which is blocked from the web.
+   Without step 7 the form works just the same (WhatsApp); the copies are only
+   written to `api/error_log`, which is blocked from the web.
 
 8. **HTTPS.** cPanel → **SSL/TLS Status**: `welandresort.com` and
    `www.welandresort.com` should both have valid certificates (**Run AutoSSL**
@@ -91,7 +93,7 @@ Before: `public_html` holds the old admin build at its root
    | `https://www.welandresort.com` | ends up on `https://welandresort.com` |
    | `https://welandresort.com/admin` | admin sign-in; signing in works |
    | `https://welandresort.com/login` | ends up on `/admin/login` |
-   | The website's enquiry form | "Enquiry sent", and the email arrives |
+   | The website's enquiry form | WhatsApp opens to +91 90744 24142 with the enquiry filled in (and, with step 7, a copy arrives by email) |
    | `https://welandresort.com/error_log` | Forbidden |
 
 **If something goes wrong:** extract `/backup-before-website.zip` (from your
