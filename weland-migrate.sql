@@ -1,7 +1,8 @@
 -- ==================================================================
 --  Weland — database update for the booking features
 --  (several rooms / Full Property, adults + kids, notes, alternate
---   mobile, payment method + reference, advance payment)
+--   mobile, payment method + reference, advance payment) and the
+--  user's room
 --
 --  phpMyAdmin → click the "weland" database → SQL tab → paste all of
 --  this → Go.
@@ -63,4 +64,10 @@ SET @sql = IF(@add, 'UPDATE payments p
                               WHERE p2.kind = ''payment'' AND p2.date = b.created_at
                               GROUP BY p2.booking_ref) a ON a.id = p.id
                         SET p.is_advance = 1', 'DO 0');
+PREPARE step FROM @sql; EXECUTE step; DEALLOCATE PREPARE step;
+
+-- Users: the room(s) a staff member looks after (optional)
+SET @add = (SELECT COUNT(*) = 0 FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'villa');
+SET @sql = IF(@add, 'ALTER TABLE users ADD COLUMN villa VARCHAR(255) NULL AFTER role', 'DO 0');
 PREPARE step FROM @sql; EXECUTE step; DEALLOCATE PREPARE step;

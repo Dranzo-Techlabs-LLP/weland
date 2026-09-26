@@ -26,6 +26,12 @@ export type BookingWrite = Omit<Booking, 'id' | 'ref' | 'payments' | 'createdAt'
   b2bCommission?: number
 }
 
+/** Fields the Add/Edit user forms send. Password: required to add, optional to edit. */
+export type UserWrite = Pick<User, 'name' | 'email' | 'role' | 'active'> & {
+  villa: string // room(s) the user looks after, "" = not assigned
+  password?: string
+}
+
 export function getToken(): string | null {
   try { return localStorage.getItem(TOKEN_KEY) } catch { return null }
 }
@@ -101,8 +107,10 @@ export const api = {
   deleteExpense: (id: string) =>
     req<{ ok: boolean }>(`/expenses/${encodeURIComponent(id)}`, { method: 'DELETE' }),
 
-  addUser: (u: Omit<User, 'id' | 'password'> & { password?: string }) =>
+  addUser: (u: UserWrite) =>
     req<{ user: User }>('/users', { method: 'POST', body: u }),
+  updateUser: (id: string, u: UserWrite) =>
+    req<{ user: User }>(`/users/${encodeURIComponent(id)}`, { method: 'PATCH', body: u }),
   setUserActive: (id: string, active: boolean) =>
     req<{ user: User }>(`/users/${encodeURIComponent(id)}`, { method: 'PATCH', body: { active } }),
 

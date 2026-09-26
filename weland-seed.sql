@@ -16,6 +16,7 @@ CREATE TABLE users (
   email VARCHAR(190) NOT NULL UNIQUE,
   password_hash VARCHAR(255) NOT NULL,
   role VARCHAR(60) NOT NULL,
+  villa VARCHAR(255) NULL,          -- room(s) the user looks after (optional)
   active TINYINT(1) NOT NULL DEFAULT 1,
   last_login DATE NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

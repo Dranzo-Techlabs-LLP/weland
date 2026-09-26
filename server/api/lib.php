@@ -100,6 +100,22 @@ function require_right(array $user, string $right): void {
   }
 }
 
+function role_exists(string $name): bool {
+  $st = db()->prepare('SELECT 1 FROM roles WHERE name = ? LIMIT 1');
+  $st->execute([$name]);
+  return (bool)$st->fetch();
+}
+
+/** True when an active user other than $exceptId can still manage users, so nobody gets locked out. */
+function other_user_manager_exists(string $exceptId): bool {
+  $st = db()->prepare('SELECT role FROM users WHERE active = 1 AND id <> ?');
+  $st->execute([$exceptId]);
+  foreach ($st->fetchAll() as $u) {
+    if (in_array('manage_users', role_rights($u['role']), true)) return true;
+  }
+  return false;
+}
+
 function gen_id(string $prefix): string {
   return $prefix . bin2hex(random_bytes(6));
 }
@@ -162,6 +178,7 @@ function public_user(array $u, bool $withRights = false): array {
     'name'      => $u['name'],
     'email'     => $u['email'],
     'role'      => $u['role'],
+    'villa'     => $u['villa'] ?? '',     // room(s) the user looks after, "" = not assigned
     'active'    => (int)$u['active'] === 1,
     'lastLogin' => $u['last_login'] ?? '',
     'password'  => '',                 // never expose hashes to the client

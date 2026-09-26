@@ -4,11 +4,10 @@ import { CircleX, FileText, Pencil, Trash2 } from 'lucide-react'
 import { can, useAuth } from '../../auth/AuthContext'
 import { useStore } from '../../data/store'
 import { Modal } from './Modal'
-import { primaryBtnCls, secondaryBtnCls } from '../styles'
+import { dangerBtnCls, primaryBtnCls, secondaryBtnCls } from '../styles'
 import type { Booking } from '../../types'
 
 const iconBtn = 'flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700'
-const dangerBtn = 'inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:opacity-60'
 
 export function BookingActions({ booking, variant, onDeleted }: { booking: Booking; variant: 'menu' | 'buttons'; onDeleted?: () => void }) {
   const { user } = useAuth()
@@ -43,8 +42,8 @@ export function BookingActions({ booking, variant, onDeleted }: { booking: Booki
     <div className="flex flex-wrap items-center gap-2">
       <Link to={invoiceTo} className={secondaryBtnCls}><FileText size={15} /> Invoice</Link>
       {canEdit && <Link to={editTo} className={secondaryBtnCls}><Pencil size={15} /> Edit</Link>}
-      {canCancel && !isCancelled && <button onClick={() => setConfirm('cancel')} className={dangerBtn}><CircleX size={15} /> Cancel</button>}
-      {canCancel && <button onClick={() => setConfirm('delete')} className={dangerBtn}><Trash2 size={15} /> Delete</button>}
+      {canCancel && !isCancelled && <button onClick={() => setConfirm('cancel')} className={dangerBtnCls}><CircleX size={15} /> Cancel</button>}
+      {canCancel && <button onClick={() => setConfirm('delete')} className={dangerBtnCls}><Trash2 size={15} /> Delete</button>}
     </div>
   )
 
@@ -63,7 +62,7 @@ export function BookingActions({ booking, variant, onDeleted }: { booking: Booki
             </p>
             <div className="mt-6 flex justify-end gap-2">
               <button onClick={() => setConfirm(null)} disabled={busy} className={secondaryBtnCls}>Keep it</button>
-              <button onClick={run} disabled={busy} className={confirm === 'delete' ? dangerBtn : primaryBtnCls}>
+              <button onClick={run} disabled={busy} className={confirm === 'delete' ? dangerBtnCls : primaryBtnCls}>
                 {busy ? 'Working…' : confirm === 'delete' ? 'Delete' : 'Cancel booking'}
               </button>
             </div>

@@ -269,26 +269,64 @@ try {
   if ($method === 'POST' && $path === 'users') {
     require_right($me, 'manage_users');
     $b = body();
-    $email = strtolower(trim($b['email'] ?? ''));
-    if ($email === '') fail('Email is required.');
+    $name  = trim((string)($b['name'] ?? ''));
+    $email = strtolower(trim((string)($b['email'] ?? '')));
+    $role  = (string)($b['role'] ?? '');
+    $pw    = (string)($b['password'] ?? '');
+    if ($name === '') fail('Full name is required.');
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) fail('Enter a valid email address.');
+    if (!role_exists($role)) fail('Choose a role.');
+    if (strlen($pw) < 6) fail('Password must be at least 6 characters.');
     $exists = db()->prepare('SELECT id FROM users WHERE LOWER(email) = ?');
     $exists->execute([$email]);
     if ($exists->fetch()) fail('A user with that email already exists.');
     $id = gen_id('u');
-    $hash = password_hash(($b['password'] ?? '') !== '' ? $b['password'] : 'changeme', PASSWORD_DEFAULT);
-    db()->prepare('INSERT INTO users (id, name, email, password_hash, role, active, last_login) VALUES (?,?,?,?,?,?,NULL)')
-        ->execute([$id, $b['name'] ?? '', $email, $hash, $b['role'] ?? 'Front Desk', array_key_exists('active', $b) ? (int)!!$b['active'] : 1]);
+    db()->prepare('INSERT INTO users (id, name, email, password_hash, role, villa, active, last_login) VALUES (?,?,?,?,?,?,?,NULL)')
+        ->execute([$id, $name, $email, password_hash($pw, PASSWORD_DEFAULT), $role, trim((string)($b['villa'] ?? '')) ?: null,
+                   array_key_exists('active', $b) ? (int)!!$b['active'] : 1]);
     json_out(['user' => get_user($id)], 201);
   }
 
+  // Edit a user: name, email, role, room, active, and optionally a new password
   if ($method === 'PATCH' && count($seg) === 2 && $seg[0] === 'users') {
     require_right($me, 'manage_users');
+    $id = $seg[1];
+    $st = db()->prepare('SELECT * FROM users WHERE id = ?');
+    $st->execute([$id]);
+    $cur = $st->fetch();
+    if (!$cur) fail('User not found.', 404);
     $b = body();
-    if (isset($b['active'])) db()->prepare('UPDATE users SET active = ? WHERE id = ?')->execute([(int)!!$b['active'], $seg[1]]);
-    if (isset($b['password']) && $b['password'] !== '') {
-      db()->prepare('UPDATE users SET password_hash = ? WHERE id = ?')->execute([password_hash($b['password'], PASSWORD_DEFAULT), $seg[1]]);
+    $name   = array_key_exists('name', $b)   ? trim((string)$b['name']) : $cur['name'];
+    $email  = array_key_exists('email', $b)  ? strtolower(trim((string)$b['email'])) : $cur['email'];
+    $role   = array_key_exists('role', $b)   ? (string)$b['role'] : $cur['role'];
+    $villa  = array_key_exists('villa', $b)  ? (trim((string)$b['villa']) ?: null) : ($cur['villa'] ?? null);
+    $active = array_key_exists('active', $b) ? (int)!!$b['active'] : (int)$cur['active'];
+    $pw     = (string)($b['password'] ?? '');
+
+    if ($name === '') fail('Full name is required.');
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) fail('Enter a valid email address.');
+    if (!role_exists($role)) fail('Choose a role.');
+    if ($pw !== '' && strlen($pw) < 6) fail('Password must be at least 6 characters.');
+    $dup = db()->prepare('SELECT id FROM users WHERE LOWER(email) = ? AND id <> ?');
+    $dup->execute([$email, $id]);
+    if ($dup->fetch()) fail('A user with that email already exists.');
+
+    // Never lock everyone out: you can't disable yourself, and an active user
+    // who can manage users must remain.
+    if ($id === $me['id'] && !$active) fail("You can't disable your own account.");
+    $wasManager = (int)$cur['active'] === 1 && in_array('manage_users', role_rights($cur['role']), true);
+    $isManager  = $active === 1 && in_array('manage_users', role_rights($role), true);
+    if ($wasManager && !$isManager && !other_user_manager_exists($id)) {
+      fail('Keep at least one active user who can manage users, such as an Administrator.');
     }
-    json_out(['user' => get_user($seg[1])]);
+
+    db()->prepare('UPDATE users SET name = ?, email = ?, role = ?, villa = ?, active = ? WHERE id = ?')
+        ->execute([$name, $email, $role, $villa, $active, $id]);
+    if ($pw !== '') {
+      db()->prepare('UPDATE users SET password_hash = ? WHERE id = ?')->execute([password_hash($pw, PASSWORD_DEFAULT), $id]);
+    }
+    if (!$active) db()->prepare('DELETE FROM sessions WHERE user_id = ?')->execute([$id]);   // sign a disabled user out
+    json_out(['user' => get_user($id)]);
   }
 
   // ---------- Roles ----------

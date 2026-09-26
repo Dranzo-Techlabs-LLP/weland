@@ -1,8 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { ROOMS } from '../lib/config'
-import { api, ApiError, setToken, type BookingWrite } from '../lib/api'
+import { api, ApiError, setToken, type BookingWrite, type UserWrite } from '../lib/api'
 import { useAuth } from '../auth/AuthContext'
-import type { AppData, Booking, BookingStatus, Expense, InvoiceSettings, Payment, User } from '../types'
+import type { AppData, Booking, BookingStatus, Expense, InvoiceSettings, Payment } from '../types'
 
 export function paidOf(b: Booking): number {
   return b.payments.reduce((s, p) => s + (p.kind === 'refund' ? -p.amount : p.amount), 0)
@@ -33,7 +33,8 @@ interface StoreValue {
   reload: () => void
   addExpense: (e: Omit<Expense, 'id'>) => Promise<void>
   deleteExpense: (id: string) => Promise<void>
-  addUser: (u: Omit<User, 'id' | 'password'> & { password?: string }) => Promise<void>
+  addUser: (u: UserWrite) => Promise<void>
+  updateUser: (id: string, u: UserWrite) => Promise<void>
   setUserActive: (id: string, active: boolean) => Promise<void>
   saveRoleRights: (roleId: string, rights: string[]) => Promise<void>
   addRole: (name: string) => Promise<void>
@@ -103,10 +104,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setData((d) => ({ ...d, expenses: d.expenses.filter((x) => x.id !== id) }))
   }), [guard])
 
-  const addUser = useCallback((u: Omit<User, 'id' | 'password'> & { password?: string }) => guard(async () => {
+  // Users: failures are thrown, not bannered, so the form can show them.
+  const addUser = useCallback(async (u: UserWrite) => {
     const { user: created } = await api.addUser(u)
     setData((d) => ({ ...d, users: [...d.users, created] }))
-  }), [guard])
+  }, [])
+
+  const updateUser = useCallback(async (id: string, u: UserWrite) => {
+    const { user: updated } = await api.updateUser(id, u)
+    setData((d) => ({ ...d, users: d.users.map((x) => (x.id === id ? updated : x)) }))
+  }, [])
 
   const setUserActive = useCallback((id: string, active: boolean) => guard(async () => {
     const { user: updated } = await api.setUserActive(id, active)
@@ -183,9 +190,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<StoreValue>(() => ({
     data, loading, error, clearError, reload: load,
-    addExpense, deleteExpense, addUser, setUserActive, saveRoleRights, addRole,
+    addExpense, deleteExpense, addUser, updateUser, setUserActive, saveRoleRights, addRole,
     saveInvoice, createBooking, updateBooking, deleteBooking, addPayment, updatePayment, deletePayment, setBookingStatus, saveVillaOverride,
-  }), [data, loading, error, clearError, load, addExpense, deleteExpense, addUser, setUserActive, saveRoleRights, addRole, saveInvoice, createBooking, updateBooking, deleteBooking, addPayment, updatePayment, deletePayment, setBookingStatus, saveVillaOverride])
+  }), [data, loading, error, clearError, load, addExpense, deleteExpense, addUser, updateUser, setUserActive, saveRoleRights, addRole, saveInvoice, createBooking, updateBooking, deleteBooking, addPayment, updatePayment, deletePayment, setBookingStatus, saveVillaOverride])
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>
 }
