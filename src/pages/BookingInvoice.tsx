@@ -1,7 +1,8 @@
+import { useEffect, type ReactNode } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { ArrowLeft, Printer } from 'lucide-react'
+import { ArrowLeft, Globe, Instagram, Mail, MessageCircle, Phone, Printer } from 'lucide-react'
 import { balanceOf, paidOf, useStore } from '../data/store'
-import { PROPERTY_NAME, PROPERTY_TAGLINE } from '../lib/config'
+import { RESORT } from '../lib/config'
 import { fmtDate, formatINR, parseISO, toISO } from '../lib/format'
 import { primaryBtnCls } from '../components/styles'
 
@@ -18,10 +19,32 @@ function Row({ label, value, strong }: { label: string; value: string; strong?: 
   )
 }
 
+/** One contact line in the invoice footer (web links open in a new tab). */
+function Contact({ icon, href, text, note }: { icon: ReactNode; href: string; text: string; note: string }) {
+  const web = href.startsWith('http')
+  return (
+    <a href={href} {...(web ? { target: '_blank', rel: 'noreferrer' } : {})} className="flex items-start gap-2.5 text-slate-700 hover:text-emerald-700">
+      <span className="mt-0.5 text-emerald-700">{icon}</span>
+      <span>
+        <span className="block font-medium">{text}</span>
+        <span className="block text-xs text-slate-400">{note}</span>
+      </span>
+    </a>
+  )
+}
+
 export function BookingInvoice() {
   const { ref } = useParams<{ ref: string }>()
   const { data } = useStore()
   const booking = data.bookings.find((b) => b.ref === ref)
+
+  // The page title is the default file name for "Save as PDF" and the print header.
+  useEffect(() => {
+    if (!ref) return
+    const previous = document.title
+    document.title = `Invoice ${ref} · ${RESORT.name}`
+    return () => { document.title = previous }
+  }, [ref])
 
   if (!booking) {
     return (
@@ -47,9 +70,14 @@ export function BookingInvoice() {
 
       <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm print:rounded-none print:border-0 print:p-0 print:shadow-none">
         <div className="flex items-start justify-between gap-4 border-b border-slate-200 pb-6">
-          <div>
-            <div className="text-2xl font-semibold tracking-tight text-slate-900">{PROPERTY_NAME}</div>
-            <div className="mt-0.5 text-sm text-slate-500">{PROPERTY_TAGLINE}</div>
+          <div className="flex items-start gap-4">
+            <img src={`${import.meta.env.BASE_URL}weland-logo.png`} alt={RESORT.name} className="h-18 w-18 shrink-0 rounded-full" />
+            <div>
+              <div className="text-2xl font-semibold tracking-tight text-slate-900">{RESORT.name}</div>
+              <div className="mt-1 text-sm leading-snug text-slate-500">
+                {RESORT.address.map((line) => (<div key={line}>{line}</div>))}
+              </div>
+            </div>
           </div>
           <div className="text-right">
             <div className="text-sm font-semibold uppercase tracking-wide text-emerald-700">Invoice</div>
@@ -103,6 +131,17 @@ export function BookingInvoice() {
             <p className="mt-2 whitespace-pre-line text-xs leading-relaxed text-slate-500">{terms}</p>
           </div>
         )}
+
+        <div className="mt-8 border-t border-slate-200 pt-4 print:break-inside-avoid">
+          <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Contact us</div>
+          <div className="mt-3 grid grid-cols-1 gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
+            <Contact icon={<Phone size={15} />} href={RESORT.phoneHref} text={RESORT.phone} note="Bookings and enquiries" />
+            <Contact icon={<MessageCircle size={15} />} href={RESORT.whatsappHref} text={RESORT.phone} note="Message us on WhatsApp" />
+            <Contact icon={<Mail size={15} />} href={`mailto:${RESORT.email}`} text={RESORT.email} note="Email" />
+            <Contact icon={<Instagram size={15} />} href={RESORT.instagramHref} text={RESORT.instagram} note="Photos and news on Instagram" />
+            <Contact icon={<Globe size={15} />} href={RESORT.websiteHref} text={RESORT.website} note="Our website" />
+          </div>
+        </div>
       </div>
     </div>
   )

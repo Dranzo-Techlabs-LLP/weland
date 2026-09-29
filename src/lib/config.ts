@@ -4,6 +4,20 @@
 export const PROPERTY_NAME = 'Weland'
 export const PROPERTY_TAGLINE = 'Rooms Admin'
 
+/** The resort's details for printed invoices (the same as on the website, website/src/lib/content.ts). */
+export const RESORT = {
+  name: 'We Land Resort',
+  address: ['Foggy Mountain, Park Road', 'Kakkadampoyil, Kozhikode, Kerala 673604'],
+  phone: '+91 90744 24142', // bookings and enquiries; the same number takes WhatsApp
+  phoneHref: 'tel:+919074424142',
+  whatsappHref: 'https://wa.me/919074424142',
+  email: 'welandresort0072@gmail.com',
+  instagram: '@weland.resort',
+  instagramHref: 'https://www.instagram.com/weland.resort/',
+  website: 'welandresort.com',
+  websiteHref: 'https://welandresort.com/',
+}
+
 export const CURRENCY = { symbol: '₹', locale: 'en-IN', code: 'INR' as const }
 
 export const INVOICE_PREFIX_DEFAULT = 'KV-'
