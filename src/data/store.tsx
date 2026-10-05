@@ -32,6 +32,7 @@ interface StoreValue {
   clearError: () => void
   reload: () => void
   addExpense: (e: Omit<Expense, 'id'>) => Promise<void>
+  updateExpense: (id: string, e: Omit<Expense, 'id'>) => Promise<void>
   deleteExpense: (id: string) => Promise<void>
   addUser: (u: UserWrite) => Promise<void>
   updateUser: (id: string, u: UserWrite) => Promise<void>
@@ -97,6 +98,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const addExpense = useCallback((e: Omit<Expense, 'id'>) => guard(async () => {
     const { expense } = await api.addExpense(e)
     setData((d) => ({ ...d, expenses: [expense, ...d.expenses] }))
+  }), [guard])
+
+  const updateExpense = useCallback((id: string, e: Omit<Expense, 'id'>) => guard(async () => {
+    const { expense } = await api.updateExpense(id, e)
+    setData((d) => ({ ...d, expenses: d.expenses.map((x) => (x.id === id ? expense : x)) }))
   }), [guard])
 
   const deleteExpense = useCallback((id: string) => guard(async () => {
@@ -190,9 +196,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<StoreValue>(() => ({
     data, loading, error, clearError, reload: load,
-    addExpense, deleteExpense, addUser, updateUser, setUserActive, saveRoleRights, addRole,
+    addExpense, updateExpense, deleteExpense, addUser, updateUser, setUserActive, saveRoleRights, addRole,
     saveInvoice, createBooking, updateBooking, deleteBooking, addPayment, updatePayment, deletePayment, setBookingStatus, saveVillaOverride,
-  }), [data, loading, error, clearError, load, addExpense, deleteExpense, addUser, updateUser, setUserActive, saveRoleRights, addRole, saveInvoice, createBooking, updateBooking, deleteBooking, addPayment, updatePayment, deletePayment, setBookingStatus, saveVillaOverride])
+  }), [data, loading, error, clearError, load, addExpense, updateExpense, deleteExpense, addUser, updateUser, setUserActive, saveRoleRights, addRole, saveInvoice, createBooking, updateBooking, deleteBooking, addPayment, updatePayment, deletePayment, setBookingStatus, saveVillaOverride])
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>
 }

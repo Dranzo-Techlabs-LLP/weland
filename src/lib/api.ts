@@ -104,6 +104,8 @@ export const api = {
 
   addExpense: (e: Omit<Expense, 'id'>) =>
     req<{ expense: Expense }>('/expenses', { method: 'POST', body: e }),
+  updateExpense: (id: string, e: Omit<Expense, 'id'>) =>
+    req<{ expense: Expense }>(`/expenses/${encodeURIComponent(id)}`, { method: 'PUT', body: e }),
   deleteExpense: (id: string) =>
     req<{ ok: boolean }>(`/expenses/${encodeURIComponent(id)}`, { method: 'DELETE' }),
 

@@ -259,6 +259,28 @@ try {
     json_out(['expense' => $row], 201);
   }
 
+  // Edit an expense in place (fields left out keep their current value)
+  if ($method === 'PUT' && count($seg) === 2 && $seg[0] === 'expenses') {
+    require_right($me, 'edit_expenses');
+    $st = db()->prepare('SELECT * FROM expenses WHERE id = ?');
+    $st->execute([$seg[1]]);
+    $cur = $st->fetch();
+    if (!$cur) fail('Expense not found.', 404);
+    $b = body();
+    $row = [
+      'id'          => $cur['id'],
+      'date'        => $b['date'] ?? $cur['date'],
+      'category'    => $b['category'] ?? $cur['category'],
+      'villa'       => $b['villa'] ?? $cur['villa'],
+      'bookingRef'  => array_key_exists('bookingRef', $b) ? (($b['bookingRef'] ?? '') ?: null) : $cur['booking_ref'],
+      'description' => $b['description'] ?? $cur['description'],
+      'amount'      => array_key_exists('amount', $b) ? (int)round((float)$b['amount']) : (int)$cur['amount'],
+    ];
+    db()->prepare('UPDATE expenses SET date = ?, category = ?, villa = ?, booking_ref = ?, description = ?, amount = ? WHERE id = ?')
+        ->execute([$row['date'], $row['category'], $row['villa'], $row['bookingRef'], $row['description'], $row['amount'], $row['id']]);
+    json_out(['expense' => $row]);
+  }
+
   if ($method === 'DELETE' && count($seg) === 2 && $seg[0] === 'expenses') {
     require_right($me, 'edit_expenses');
     db()->prepare('DELETE FROM expenses WHERE id = ?')->execute([$seg[1]]);

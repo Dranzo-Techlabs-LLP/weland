@@ -13,7 +13,7 @@ const BLANK = { date: TODAY_ISO, category: EXPENSE_CATEGORIES[1], rooms: [] as s
 
 export function Expenses() {
   const { user } = useAuth()
-  const { data, addExpense, deleteExpense } = useStore()
+  const { data, addExpense, updateExpense, deleteExpense } = useStore()
   const canEdit = can(user, 'edit_expenses')
 
   const [villa, setVilla] = useState('All rooms')
@@ -41,8 +41,9 @@ export function Expenses() {
     if (!form.fullProperty && form.rooms.length === 0) { setErr('Pick at least one room (or Full Property).'); return }
     if (!form.amount) { setErr('Enter an amount.'); return }
     const villa = form.fullProperty ? FULL_PROPERTY : form.rooms.join(', ')
-    if (editId) deleteExpense(editId)
-    addExpense({ date: form.date, category: form.category, villa, bookingRef: form.bookingRef || undefined, description: form.description, amount: Math.round(Number(form.amount)) })
+    const fields = { date: form.date, category: form.category, villa, bookingRef: form.bookingRef.trim(), description: form.description, amount: Math.round(Number(form.amount)) }
+    if (editId) updateExpense(editId, fields)
+    else addExpense(fields)
     setOpen(false)
     setEditId(null)
   }

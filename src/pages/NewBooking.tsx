@@ -21,6 +21,32 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   )
 }
 
+/** B2B commission with 10 / 15 / 20 % of the total and the resulting net revenue.
+ *  Used by New / Edit booking and by the booking page's payment and expense panels. */
+export function B2bCommissionBlock({ total, value, onChange, autoFocus }: {
+  total: number; value: string; onChange: (v: string) => void; autoFocus?: boolean
+}) {
+  const net = total - (Number(value) || 0)
+  return (
+    <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <label className="block flex-1">
+          <span className="mb-1.5 block text-[13px] font-medium text-slate-700">B2B commission (₹)</span>
+          <input type="number" min={0} className={`${inputCls} w-full max-w-xs`} value={value} onChange={(e) => onChange(e.target.value)} placeholder="0" autoFocus={autoFocus} />
+        </label>
+        <div className="text-right text-sm text-slate-500">Net revenue: <span className="nums font-semibold text-emerald-700">{formatINR(net)}</span></div>
+      </div>
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        {[10, 15, 20].map((pct) => (
+          <button type="button" key={pct} onClick={() => onChange(String(Math.round((total * pct) / 100)))}
+            className="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100">{pct}%</button>
+        ))}
+        <span className="ml-1 text-xs text-slate-400">B2B is booked as an expense linked to this booking. Invoice still shows the full amount.</span>
+      </div>
+    </div>
+  )
+}
+
 /** Advance + B2B commission block. Shared by New and Edit booking. */
 export function MoneyBlock({
   total, advance, advanceMethod, b2b, advanceLabel = 'Advance collected (₹)',
@@ -29,7 +55,6 @@ export function MoneyBlock({
   total: number; advance: string; advanceMethod: string; b2b: string; advanceLabel?: string
   onAdvance: (v: string) => void; onMethod: (v: string) => void; onB2b: (v: string) => void
 }) {
-  const net = total - (Number(b2b) || 0)
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -40,22 +65,7 @@ export function MoneyBlock({
           </select>
         </Field>
       </div>
-      <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <label className="block flex-1">
-            <span className="mb-1.5 block text-[13px] font-medium text-slate-700">B2B commission (₹)</span>
-            <input type="number" min={0} className={`${inputCls} w-full max-w-xs`} value={b2b} onChange={(e) => onB2b(e.target.value)} placeholder="0" />
-          </label>
-          <div className="text-right text-sm text-slate-500">Net revenue: <span className="nums font-semibold text-emerald-700">{formatINR(net)}</span></div>
-        </div>
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          {[10, 15, 20].map((pct) => (
-            <button type="button" key={pct} onClick={() => onB2b(String(Math.round((total * pct) / 100)))}
-              className="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100">{pct}%</button>
-          ))}
-          <span className="ml-1 text-xs text-slate-400">B2B is booked as an expense linked to this booking. Invoice still shows the full amount.</span>
-        </div>
-      </div>
+      <B2bCommissionBlock total={total} value={b2b} onChange={onB2b} />
     </div>
   )
 }
