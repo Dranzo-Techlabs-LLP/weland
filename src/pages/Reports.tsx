@@ -3,12 +3,16 @@ import { CheckCircle2, Download, Eye, FileText, X } from 'lucide-react'
 import { B2B_CATEGORY, paidOf, useStore } from '../data/store'
 import { bookingHasRoom, ROOM_OPTIONS } from '../lib/config'
 import { formatINR, TODAY, TODAY_ISO, toISO } from '../lib/format'
-import { BOOKING_STATUSES } from '../lib/permissions'
+import { BOOKING_STATUSES, PAYMENT_METHODS } from '../lib/permissions'
 import { inputCls, primaryBtnCls, secondaryBtnCls, selectCls } from '../components/styles'
-import type { AppData } from '../types'
+import type { AppData, Booking } from '../types'
 
 type ReportType = 'bookings' | 'payments' | 'expenses' | 'combined'
 interface Report { columns: string[]; rows: (string | number)[][]; money: number[] }
+
+/** Payment methods used on a booking, in order ("UPI, Cash"); "—" when none was recorded. */
+const methodsOf = (b: Booking) =>
+  [...new Set(b.payments.filter((p) => p.kind === 'payment' && p.method).map((p) => p.method as string))].join(', ') || '—'
 
 function build(type: ReportType, data: AppData, from: string, to: string, villa: string, basis: 'stay' | 'cash'): Report {
   const inRange = (d: string) => (!from || d >= from) && (!to || d <= to)
@@ -18,8 +22,8 @@ function build(type: ReportType, data: AppData, from: string, to: string, villa:
     const rows = data.bookings
       .filter((b) => villaOk(b.villa) && inRange(b.checkIn))
       .sort((a, b) => (a.checkIn < b.checkIn ? 1 : -1))
-      .map((b) => [b.ref, b.villa, b.guest, b.phone, b.checkIn, b.checkOut, b.guests, b.status, b.total, paidOf(b), b.source])
-    return { columns: ['Reference', 'Room', 'Guest', 'Phone', 'Check-in', 'Check-out', 'Guests', 'Status', 'Total', 'Paid', 'Source'], rows, money: [8, 9] }
+      .map((b) => [b.ref, b.villa, b.guest, b.phone, b.checkIn, b.checkOut, b.guests, b.status, b.total, paidOf(b), methodsOf(b), b.source])
+    return { columns: ['Reference', 'Room', 'Guest', 'Phone', 'Check-in', 'Check-out', 'Guests', 'Status', 'Total', 'Paid', 'Payment method', 'Source'], rows, money: [8, 9] }
   }
   if (type === 'payments') {
     const rows: (string | number)[][] = []
@@ -28,11 +32,11 @@ function build(type: ReportType, data: AppData, from: string, to: string, villa:
       for (const p of b.payments) {
         const ok = basis === 'cash' ? inRange(p.date) : inRange(b.checkIn)
         if (!ok) continue
-        rows.push([p.date, b.ref, b.guest, b.villa, p.kind, p.amount])
+        rows.push([p.date, b.ref, b.guest, b.villa, p.kind, p.method || '—', p.amount])
       }
     }
     rows.sort((a, b) => (String(a[0]) < String(b[0]) ? 1 : -1))
-    return { columns: ['Date', 'Reference', 'Guest', 'Room', 'Kind', 'Amount'], rows, money: [5] }
+    return { columns: ['Date', 'Reference', 'Guest', 'Room', 'Kind', 'Method', 'Amount'], rows, money: [6] }
   }
   if (type === 'expenses') {
     const rows = data.expenses
@@ -71,15 +75,16 @@ function summarize(type: ReportType, rows: (string | number)[][]) {
   if (type === 'bookings') return { credited: col(9), debited: 0 }
   if (type === 'expenses') return { credited: 0, debited: col(5) }
   if (type === 'combined') return { credited: col(3), debited: col(4) }
-  const credited = rows.reduce((s, r) => s + (r[4] === 'payment' && typeof r[5] === 'number' ? r[5] : 0), 0)
-  const debited = rows.reduce((s, r) => s + (r[4] === 'refund' && typeof r[5] === 'number' ? r[5] : 0), 0)
+  const credited = rows.reduce((s, r) => s + (r[4] === 'payment' && typeof r[6] === 'number' ? r[6] : 0), 0)
+  const debited = rows.reduce((s, r) => s + (r[4] === 'refund' && typeof r[6] === 'number' ? r[6] : 0), 0)
   return { credited, debited }
 }
 
-/** A column filters by dropdown (Room/Status), free text (with !exclude), or not at all (money columns). */
-function filterKind(col: string, idx: number, money: number[]): 'room' | 'status' | 'none' | 'text' {
+/** A column filters by dropdown (Room/Status/Method), free text (with !exclude), or not at all (money columns). */
+function filterKind(col: string, idx: number, money: number[]): 'room' | 'status' | 'method' | 'none' | 'text' {
   if (col === 'Room') return 'room'
   if (col === 'Status') return 'status'
+  if (col === 'Payment method' || col === 'Method') return 'method'
   if (money.includes(idx)) return 'none'
   return 'text'
 }
@@ -154,6 +159,7 @@ export function Reports() {
         if (kind === 'none') return true
         if (kind === 'room') return !f || f === 'All' || bookingHasRoom(String(row[i]), f)
         if (kind === 'status') return !f || f === 'All' || String(row[i]) === f
+        if (kind === 'method') return !f || f === 'All' || String(row[i]).split(', ').includes(f)
         return matchText(String(row[i]), f)
       }),
     )
@@ -245,6 +251,11 @@ export function Reports() {
                           {kind === 'status' && (
                             <select value={val || 'All'} onChange={(e) => set(e.target.value)} className={filterSelectCls}>
                               <option>All</option>{BOOKING_STATUSES.map((s) => (<option key={s}>{s}</option>))}
+                            </select>
+                          )}
+                          {kind === 'method' && (
+                            <select value={val || 'All'} onChange={(e) => set(e.target.value)} className={filterSelectCls}>
+                              <option>All</option>{PAYMENT_METHODS.map((m) => (<option key={m}>{m}</option>))}
                             </select>
                           )}
                           {kind === 'text' && (
