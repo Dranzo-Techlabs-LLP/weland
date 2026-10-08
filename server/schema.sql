@@ -70,7 +70,9 @@ CREATE TABLE IF NOT EXISTS expenses (
 CREATE TABLE IF NOT EXISTS room_overrides (
   villa VARCHAR(60) PRIMARY KEY,
   base_rate INT NULL,
-  notes TEXT NULL
+  notes TEXT NULL,
+  min_guests INT NULL,               -- capacity (rooms that allow editing it)
+  max_guests INT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS invoice_settings (
@@ -78,7 +80,9 @@ CREATE TABLE IF NOT EXISTS invoice_settings (
   prefix VARCHAR(20) NOT NULL DEFAULT 'KV-',
   next INT NOT NULL DEFAULT 1,
   padding INT NOT NULL DEFAULT 5,
-  terms TEXT NOT NULL
+  terms TEXT NOT NULL,
+  show_payments TINYINT(1) NOT NULL DEFAULT 0,   -- print every payment entry on the invoice
+  show_b2b TINYINT(1) NOT NULL DEFAULT 0         -- print the B2B commission on the invoice
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS sessions (

@@ -38,6 +38,7 @@ export interface RoomConfig {
   maxGuests: number
   baseRate: number
   status: 'Active' | 'Inactive'
+  editableCapacity?: boolean // capacity can be changed on the Rooms page (stored as an override)
 }
 
 export const ROOMS: RoomConfig[] = [
@@ -48,6 +49,8 @@ export const ROOMS: RoomConfig[] = [
   { id: 'r5', name: 'B1', slug: 'b1', code: 'B1', color: '#b45309', minGuests: 2, maxGuests: 4, baseRate: 0, status: 'Active' },
   { id: 'r6', name: 'B2', slug: 'b2', code: 'B2', color: '#92400e', minGuests: 2, maxGuests: 5, baseRate: 0, status: 'Active' },
   { id: 'r7', name: 'Dormitory', slug: 'dormitory', code: 'DORM', color: '#475569', minGuests: 10, maxGuests: 16, baseRate: 0, status: 'Active' },
+  // Event space; seats around 80 theatre-style (website/src/lib/content.ts)
+  { id: 'r8', name: 'Party Hall', slug: 'party-hall', code: 'HALL', color: '#be185d', minGuests: 10, maxGuests: 80, baseRate: 0, status: 'Active', editableCapacity: true },
 ]
 
 export const ROOM_NAMES: string[] = ROOMS.map((r) => r.name)

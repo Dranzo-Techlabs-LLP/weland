@@ -2,9 +2,9 @@ import { useState, type FormEvent } from 'react'
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import { can, useAuth } from '../auth/AuthContext'
-import { B2B_CATEGORY, useStore } from '../data/store'
+import { b2bRowsOf, useStore } from '../data/store'
 import { bookingRooms, FULL_PROPERTY, isFullProperty } from '../lib/config'
-import { parseISO } from '../lib/format'
+import { formatINR, parseISO } from '../lib/format'
 import { BOOKING_STATUSES } from '../lib/permissions'
 import { inputCls, primaryBtnCls, secondaryBtnCls, selectCls, textareaCls } from '../components/styles'
 import { MoneyBlock } from './NewBooking'
@@ -28,7 +28,7 @@ export function EditBooking() {
   const { user } = useAuth()
   const { data, updateBooking } = useStore()
   const booking = data.bookings.find((b) => b.ref === ref)
-  const b2bExpense = booking ? data.expenses.find((e) => e.bookingRef === booking.ref && e.category === B2B_CATEGORY) : undefined
+  const b2bRows = booking ? b2bRowsOf(data.expenses, booking.ref) : []
   const advPay = booking?.payments.find((p) => p.advance)
 
   const [form, setForm] = useState(() => ({
@@ -40,7 +40,6 @@ export function EditBooking() {
     status: (booking?.status ?? 'confirmed') as BookingStatus, source: booking?.source ?? 'Direct',
     total: booking ? String(booking.total) : '',
     advance: advPay ? String(advPay.amount) : '', advanceMethod: advPay?.method || 'Cash',
-    b2b: b2bExpense ? String(b2bExpense.amount) : '',
     notes: booking?.notes ?? '',
   }))
   const [submitting, setSubmitting] = useState(false)
@@ -76,7 +75,6 @@ export function EditBooking() {
       status: form.status, source: form.source, total: Math.round(Number(form.total) || 0), notes: form.notes,
       advance: Math.round(Number(form.advance) || 0), // 0 removes the advance
       advanceMethod: form.advanceMethod,
-      b2bCommission: Math.round(Number(form.b2b) || 0),
     })
     setSubmitting(false)
     navigate(`/bookings/${booking!.ref}`)
@@ -118,8 +116,15 @@ export function EditBooking() {
         </div>
 
         <MoneyBlock
-          total={Math.round(Number(form.total) || 0)} advance={form.advance} advanceMethod={form.advanceMethod} b2b={form.b2b}
-          onAdvance={(v) => set('advance', v)} onMethod={(v) => set('advanceMethod', v)} onB2b={(v) => set('b2b', v)}
+          advance={form.advance} advanceMethod={form.advanceMethod}
+          onAdvance={(v) => set('advance', v)} onMethod={(v) => set('advanceMethod', v)}
+          b2bInfo={<>
+            <span className="font-medium text-slate-700">B2B commission:</span>{' '}
+            {b2bRows.length
+              ? <><span className="nums font-semibold text-violet-600">−{formatINR(b2bRows.reduce((s, e) => s + e.amount, 0))}</span> in {b2bRows.length} {b2bRows.length === 1 ? 'entry' : 'entries'}. </>
+              : 'none yet. '}
+            Add more on the booking page with <span className="font-medium">Expense → B2B Commission</span>; change or delete each one in its payment ledger.
+          </>}
         />
 
         <Field label="Notes"><textarea rows={2} className={textareaCls} value={form.notes} onChange={(e) => set('notes', e.target.value)} /></Field>

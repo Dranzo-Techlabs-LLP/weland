@@ -176,7 +176,9 @@ try {
     $b = body();
     $exists = db()->prepare('SELECT ref FROM bookings WHERE ref = ?');
     $exists->execute([$ref]);
-    if (!$exists->fetch()) fail('Booking not found.', 404);
+    $found = $exists->fetch();
+    if (!$found) fail('Booking not found.', 404);
+    $ref = $found['ref']; // the booking's own ref (the URL may differ in letter case)
     if (($b['status'] ?? '') === 'cancelled') require_right($me, 'cancel_bookings');
     $pdo = db();
     $pdo->beginTransaction();
@@ -189,6 +191,11 @@ try {
           $b['checkIn'] ?? null, $b['checkOut'] ?? null, $guests, $adults, $kids,
           $b['status'] ?? 'confirmed', (int)round((float)($b['total'] ?? 0)), $b['source'] ?? 'Direct', ($b['notes'] ?? '') ?: null, $ref,
         ]);
+    // B2B commission entries are booked under the booking's first room, so they follow a room change
+    if (($b['villa'] ?? '') !== '') {
+      $pdo->prepare("UPDATE expenses SET villa = ? WHERE booking_ref = ? AND category = 'B2B Commission'")
+          ->execute([primary_room($b['villa']), $ref]);
+    }
     // The advance entered while booking: create / update / remove that one payment
     if (array_key_exists('advance', $b)) {
       sync_advance($ref, (int)round((float)($b['advance'] ?? 0)), $b['advanceMethod'] ?? 'Cash');
@@ -254,6 +261,7 @@ try {
       'villa' => $b['villa'] ?? '', 'bookingRef' => ($b['bookingRef'] ?? '') ?: null,
       'description' => $b['description'] ?? '', 'amount' => (int)round((float)($b['amount'] ?? 0)),
     ];
+    $row = normalize_expense_link($row);
     db()->prepare('INSERT INTO expenses (id, date, category, villa, booking_ref, description, amount) VALUES (?,?,?,?,?,?,?)')
         ->execute([$row['id'], $row['date'], $row['category'], $row['villa'], $row['bookingRef'], $row['description'], $row['amount']]);
     json_out(['expense' => $row], 201);
@@ -276,6 +284,7 @@ try {
       'description' => $b['description'] ?? $cur['description'],
       'amount'      => array_key_exists('amount', $b) ? (int)round((float)$b['amount']) : (int)$cur['amount'],
     ];
+    $row = normalize_expense_link($row);
     db()->prepare('UPDATE expenses SET date = ?, category = ?, villa = ?, booking_ref = ?, description = ?, amount = ? WHERE id = ?')
         ->execute([$row['date'], $row['category'], $row['villa'], $row['bookingRef'], $row['description'], $row['amount'], $row['id']]);
     json_out(['expense' => $row]);
@@ -378,22 +387,75 @@ try {
     $next    = isset($b['next'])    ? (int)$b['next']    : (int)$cur['next'];
     $padding = isset($b['padding']) ? (int)$b['padding'] : (int)$cur['padding'];
     $terms   = $b['terms']   ?? $cur['terms'];
-    db()->prepare('UPDATE invoice_settings SET prefix=?, next=?, padding=?, terms=? WHERE id=1')
-        ->execute([$prefix, $next, $padding, $terms]);
-    json_out(['invoice' => ['prefix' => $prefix, 'next' => $next, 'padding' => $padding, 'terms' => $terms]]);
+    // "Show on invoice" options: only touched when sent, so the other settings save without them
+    $withShow = array_key_exists('showPayments', $b) || array_key_exists('showB2b', $b);
+    $show = [];
+    foreach (['showPayments' => 'show_payments', 'showB2b' => 'show_b2b'] as $key => $col) {
+      if (array_key_exists($key, $b) && !is_bool($b[$key])) fail('Invalid invoice option.');
+      $show[$col] = array_key_exists($key, $b) ? (int)$b[$key] : (int)($cur[$col] ?? 0);
+    }
+    if ($withShow) {
+      db()->prepare('UPDATE invoice_settings SET prefix=?, next=?, padding=?, terms=?, show_payments=?, show_b2b=? WHERE id=1')
+          ->execute([$prefix, $next, $padding, $terms, $show['show_payments'], $show['show_b2b']]);
+    } else {
+      db()->prepare('UPDATE invoice_settings SET prefix=?, next=?, padding=?, terms=? WHERE id=1')
+          ->execute([$prefix, $next, $padding, $terms]);
+    }
+    json_out(['invoice' => public_invoice(db()->query('SELECT * FROM invoice_settings WHERE id = 1')->fetch())]);
   }
 
-  // ---------- Room overrides (base rate / notes) ----------
+  // ---------- Room overrides (base rate / notes / capacity) ----------
+  //  Only the fields sent are changed; the others keep their saved value.
+  //  Capacity is only for rooms that allow it (CAPACITY_ROOMS) and only touches
+  //  its columns when sent, so base rate / notes saves never depend on them.
+  //  Replies with the saved override, so the app shows what was really stored.
   if ($method === 'PUT' && count($seg) === 3 && $seg[0] === 'rooms' && $seg[2] === 'override') {
     require_right($me, 'edit_villas');
     $name = urldecode($seg[1]);
     $b = body();
-    $rate  = array_key_exists('baseRate', $b) ? (int)$b['baseRate'] : null;
-    $notes = array_key_exists('notes', $b) ? $b['notes'] : null;
-    db()->prepare('INSERT INTO room_overrides (villa, base_rate, notes) VALUES (?,?,?)
-                   ON DUPLICATE KEY UPDATE base_rate = VALUES(base_rate), notes = VALUES(notes)')
-        ->execute([$name, $rate, $notes]);
-    json_out(['ok' => true]);
+    // An unreadable body comes back empty; don't treat that as "keep everything".
+    if (!array_intersect(['baseRate', 'notes', 'minGuests', 'maxGuests'], array_keys($b))) fail('Nothing to save.');
+    $load = function () use ($name) {
+      $st = db()->prepare('SELECT * FROM room_overrides WHERE villa = ?');
+      $st->execute([$name]);
+      return $st->fetch() ?: [];
+    };
+    $cur = $load();
+    // A whole number from the body, or the saved value when the field isn't sent.
+    $num = function (string $key, string $col) use ($b, $cur) {
+      if (!array_key_exists($key, $b)) return isset($cur[$col]) ? (int)$cur[$col] : null;
+      $v = $b[$key];
+      if ($v === null || $v === '') return null;
+      if (is_int($v)) return $v;
+      if (is_string($v) && preg_match('/^-?\d{1,9}$/', $v)) return (int)$v;
+      if (is_float($v) && is_finite($v) && floor($v) === $v && abs($v) < 1e9) return (int)$v;
+      fail('Enter whole numbers only.');
+    };
+    $rate  = $num('baseRate', 'base_rate');
+    $notes = array_key_exists('notes', $b) ? $b['notes'] : ($cur['notes'] ?? null);
+    if ($notes !== null && !is_string($notes)) fail('Notes must be text.');
+    if ($rate !== null && ($rate < 0 || $rate > 10000000)) fail('Enter a base rate between ₹0 and ₹1,00,00,000.');
+
+    $withCapacity = array_key_exists('minGuests', $b) || array_key_exists('maxGuests', $b);
+    if (!$withCapacity) {
+      db()->prepare('INSERT INTO room_overrides (villa, base_rate, notes) VALUES (?,?,?)
+                     ON DUPLICATE KEY UPDATE base_rate = VALUES(base_rate), notes = VALUES(notes)')
+          ->execute([$name, $rate, $notes]);
+      json_out(['ok' => true, 'override' => public_override($load())]);
+    }
+    if (!in_array($name, CAPACITY_ROOMS, true)) fail("This room's capacity can't be changed.");
+    $min = $num('minGuests', 'min_guests');
+    $max = $num('maxGuests', 'max_guests');
+    if (($min === null) !== ($max === null)) fail('Enter both the minimum and maximum guests.');
+    if ($min !== null && ($min < 1 || $min > 10000 || $max < 1 || $max > 10000)) {
+      fail('Capacity must be between 1 and 10,000 guests.');
+    }
+    if ($min !== null && $min > $max) fail('Minimum guests can\'t be more than maximum guests.');
+    db()->prepare('INSERT INTO room_overrides (villa, base_rate, notes, min_guests, max_guests) VALUES (?,?,?,?,?)
+                   ON DUPLICATE KEY UPDATE base_rate = VALUES(base_rate), notes = VALUES(notes),
+                                           min_guests = VALUES(min_guests), max_guests = VALUES(max_guests)')
+        ->execute([$name, $rate, $notes, $min, $max]);
+    json_out(['ok' => true, 'override' => public_override($load())]);
   }
 
   fail("Not found: $method /$path", 404);

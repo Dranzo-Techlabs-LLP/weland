@@ -16,15 +16,33 @@ export function Invoice() {
   const [next, setNext] = useState(String(s.next))
   const [padding, setPadding] = useState(String(s.padding))
   const [terms, setTerms] = useState(s.terms)
+  const [showPayments, setShowPayments] = useState(!!s.showPayments)
+  const [showB2b, setShowB2b] = useState(!!s.showB2b)
   const [msg, setMsg] = useState('')
+  const [err, setErr] = useState('')
+  const [saving, setSaving] = useState(false)
 
   const pad = Math.max(1, Math.min(10, Number(padding) || 1))
   const nextNum = Number(next) || 0
   const preview = (n: number) => `${prefix}${String(n).padStart(pad, '0')}`
 
-  function save() {
-    saveInvoice({ prefix, next: nextNum, padding: pad, terms })
-    setMsg('Invoice settings saved.')
+  async function save() {
+    setMsg('')
+    setErr('')
+    setSaving(true)
+    try {
+      // The "show on invoice" options are sent only when changed
+      await saveInvoice({
+        prefix, next: nextNum, padding: pad, terms,
+        ...(showPayments !== !!s.showPayments ? { showPayments } : {}),
+        ...(showB2b !== !!s.showB2b ? { showB2b } : {}),
+      })
+      setMsg('Invoice settings saved.')
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Could not save. Please try again.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -72,6 +90,27 @@ export function Invoice() {
       </div>
 
       <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <h2 className="text-[15px] font-semibold text-slate-900">Show on invoice</h2>
+        <p className="mt-0.5 text-[13px] text-slate-500">Tick an option to print it on every invoice. Left unticked, it isn't shown.</p>
+        <div className="mt-3 space-y-3">
+          <label className="flex items-start gap-3">
+            <input type="checkbox" checked={showPayments} onChange={(e) => setShowPayments(e.target.checked)} disabled={!canEdit} className="mt-0.5 h-4 w-4 rounded border-slate-300 text-emerald-700 focus:ring-emerald-700/30 disabled:opacity-60" />
+            <span>
+              <span className="block text-sm font-medium text-slate-900">Payment entries</span>
+              <span className="block text-[13px] text-slate-500">List every payment, advance and refund (date, method, reference, amount), not only the total paid.</span>
+            </span>
+          </label>
+          <label className="flex items-start gap-3">
+            <input type="checkbox" checked={showB2b} onChange={(e) => setShowB2b(e.target.checked)} disabled={!canEdit} className="mt-0.5 h-4 w-4 rounded border-slate-300 text-emerald-700 focus:ring-emerald-700/30 disabled:opacity-60" />
+            <span>
+              <span className="block text-sm font-medium text-slate-900">B2B commission</span>
+              <span className="block text-[13px] text-slate-500">List the booking's B2B commission entries and the total, with the net amount after commission.</span>
+            </span>
+          </label>
+        </div>
+      </div>
+
+      <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <h2 className="text-[15px] font-semibold text-slate-900">Terms &amp; conditions</h2>
         <p className="mt-0.5 text-[13px] text-slate-500">Printed on a separate second page of every invoice. Leave blank to omit the page entirely. Each line becomes its own line on the invoice.</p>
         <textarea rows={10} value={terms} onChange={(e) => setTerms(e.target.value.slice(0, MAX_TERMS))} disabled={!canEdit} className={`${textareaCls} mt-3 font-mono text-[13px] disabled:bg-slate-50`} />
@@ -80,8 +119,9 @@ export function Invoice() {
 
       {canEdit ? (
         <div className="mt-4 flex items-center gap-3">
-          <button onClick={save} className={primaryBtnCls}>Save</button>
+          <button onClick={save} disabled={saving} className={`${primaryBtnCls} disabled:cursor-not-allowed disabled:opacity-60`}>{saving ? 'Saving…' : 'Save'}</button>
           {msg && <span className="text-sm text-emerald-700">{msg}</span>}
+          {err && <span className="text-sm text-red-600">{err}</span>}
         </div>
       ) : (
         <p className="mt-4 text-[13px] text-slate-400">You have read-only access to invoice settings.</p>

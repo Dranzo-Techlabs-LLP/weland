@@ -22,11 +22,12 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 /** B2B commission with 10 / 15 / 20 % of the total and the resulting net revenue.
- *  Used by New / Edit booking and by the booking page's payment and expense panels. */
-export function B2bCommissionBlock({ total, value, onChange, autoFocus }: {
+ *  Used by the booking page's Expense panel (B2B Commission) and the B2B row editor. */
+export function B2bCommissionBlock({ total, value, onChange, autoFocus, others = 0 }: {
   total: number; value: string; onChange: (v: string) => void; autoFocus?: boolean
+  others?: number // the booking's other B2B entries, also taken off the net revenue
 }) {
-  const net = total - (Number(value) || 0)
+  const net = total - others - (Number(value) || 0)
   return (
     <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
@@ -47,13 +48,14 @@ export function B2bCommissionBlock({ total, value, onChange, autoFocus }: {
   )
 }
 
-/** Advance + B2B commission block. Shared by New and Edit booking. */
+/** Advance block, plus a note on the B2B commission. Shared by New and Edit booking.
+ *  B2B commission is entered on the booking page (Expense), where a booking can have several. */
 export function MoneyBlock({
-  total, advance, advanceMethod, b2b, advanceLabel = 'Advance collected (₹)',
-  onAdvance, onMethod, onB2b,
+  advance, advanceMethod, advanceLabel = 'Advance collected (₹)', onAdvance, onMethod, b2bInfo,
 }: {
-  total: number; advance: string; advanceMethod: string; b2b: string; advanceLabel?: string
-  onAdvance: (v: string) => void; onMethod: (v: string) => void; onB2b: (v: string) => void
+  advance: string; advanceMethod: string; advanceLabel?: string
+  onAdvance: (v: string) => void; onMethod: (v: string) => void
+  b2bInfo: React.ReactNode
 }) {
   return (
     <div className="space-y-4">
@@ -65,7 +67,7 @@ export function MoneyBlock({
           </select>
         </Field>
       </div>
-      <B2bCommissionBlock total={total} value={b2b} onChange={onB2b} />
+      <div className="rounded-xl border border-slate-200 bg-slate-50/60 px-4 py-3 text-[13px] text-slate-600">{b2bInfo}</div>
     </div>
   )
 }
@@ -80,7 +82,7 @@ export function NewBooking() {
     checkIn: '', checkOut: '',
     adults: 2, kids: 0,
     status: 'confirmed' as BookingStatus, source: 'Direct', total: '',
-    advance: '', advanceMethod: 'Cash', b2b: '', notes: '',
+    advance: '', advanceMethod: 'Cash', notes: '',
   })
   const [submitting, setSubmitting] = useState(false)
   const [err, setErr] = useState('')
@@ -106,7 +108,6 @@ export function NewBooking() {
       status: form.status, source: form.source, total: Math.round(Number(form.total) || 0), notes: form.notes,
       advance: Number(form.advance) || undefined,
       advanceMethod: form.advance ? form.advanceMethod : undefined,
-      b2bCommission: Math.round(Number(form.b2b) || 0),
     })
     setSubmitting(false)
     if (ref) navigate(`/bookings/${ref}`)
@@ -148,8 +149,9 @@ export function NewBooking() {
         </div>
 
         <MoneyBlock
-          total={Math.round(Number(form.total) || 0)} advance={form.advance} advanceMethod={form.advanceMethod} b2b={form.b2b}
-          onAdvance={(v) => set('advance', v)} onMethod={(v) => set('advanceMethod', v)} onB2b={(v) => set('b2b', v)}
+          advance={form.advance} advanceMethod={form.advanceMethod}
+          onAdvance={(v) => set('advance', v)} onMethod={(v) => set('advanceMethod', v)}
+          b2bInfo={<><span className="font-medium text-slate-700">B2B commission:</span> add it after creating the booking, on the booking page with <span className="font-medium">Expense → B2B Commission</span>. A booking can have several entries.</>}
         />
 
         <Field label="Notes"><textarea rows={2} className={textareaCls} value={form.notes} onChange={(e) => set('notes', e.target.value)} placeholder="Anything to remember about this booking…" /></Field>

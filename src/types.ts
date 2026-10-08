@@ -74,6 +74,16 @@ export interface InvoiceSettings {
   next: number
   padding: number
   terms: string
+  showPayments?: boolean // print every payment entry on the invoice
+  showB2b?: boolean // print the booking's B2B commission on the invoice
+}
+
+/** Per-room settings saved on the Rooms page (capacity only for rooms that allow it). */
+export interface RoomOverride {
+  baseRate?: number
+  notes?: string
+  minGuests?: number
+  maxGuests?: number
 }
 
 /** The full client dataset. */
@@ -83,7 +93,7 @@ export interface AppData {
   users: User[]
   roles: Role[]
   invoice: InvoiceSettings
-  villaOverrides: Record<string, { baseRate?: number; notes?: string }>
+  villaOverrides: Record<string, RoomOverride>
 }
 
 export interface AuthUser {

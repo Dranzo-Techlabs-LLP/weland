@@ -14,6 +14,9 @@ namespace Weland;
 
 use PDO;
 
+/** Rooms whose capacity can be changed on the Rooms page (editableCapacity in src/lib/config.ts). */
+const CAPACITY_ROOMS = ['Party Hall'];
+
 function cors(): void {
   $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
   if ($origin !== '' && in_array($origin, ALLOWED_ORIGINS, true)) {
@@ -50,6 +53,25 @@ function json_out($data, int $code = 200): void {
 
 function fail(string $message, int $code = 400): void {
   json_out(['error' => $message], $code);
+}
+
+/** The invoice_settings row as the app sees it (the show_* options are false before the migration). */
+function public_invoice(array $inv): array {
+  return [
+    'prefix' => $inv['prefix'], 'next' => (int)$inv['next'], 'padding' => (int)$inv['padding'], 'terms' => $inv['terms'],
+    'showPayments' => (int)($inv['show_payments'] ?? 0) === 1,
+    'showB2b'      => (int)($inv['show_b2b'] ?? 0) === 1,
+  ];
+}
+
+/** A room_overrides row as the app sees it (unset values are left out). */
+function public_override(array $o): array {
+  $entry = [];
+  if (($o['base_rate'] ?? null) !== null)  $entry['baseRate'] = (int)$o['base_rate'];
+  if (($o['notes'] ?? null) !== null)      $entry['notes'] = $o['notes'];
+  if (($o['min_guests'] ?? null) !== null) $entry['minGuests'] = (int)$o['min_guests'];
+  if (($o['max_guests'] ?? null) !== null) $entry['maxGuests'] = (int)$o['max_guests'];
+  return $entry;
 }
 
 function body(): array {
@@ -130,16 +152,47 @@ function primary_room(string $villa): string {
   return $villa;
 }
 
-/** Create/update/remove the single B2B-commission expense linked to a booking. */
+/** An expenses row as the app sees it. */
+function expense_shape(array $e): array {
+  return [
+    'id' => $e['id'], 'date' => $e['date'], 'category' => $e['category'], 'villa' => $e['villa'],
+    'bookingRef' => $e['booking_ref'] ?? null, 'description' => $e['description'], 'amount' => (int)$e['amount'],
+  ];
+}
+
+/** An expense's category and linked booking as they are stored: "B2B Commission" in any letter case
+ *  becomes that exact name, and a ref that matches a booking (in any case) becomes the booking's own
+ *  ref, so the booking page finds it. */
+function normalize_expense_link(array $row): array {
+  if (is_string($row['category']) && strcasecmp(trim($row['category']), 'B2B Commission') === 0) {
+    $row['category'] = 'B2B Commission';
+  }
+  if ($row['bookingRef'] !== null) {
+    $ref = trim((string)$row['bookingRef']);
+    $st = db()->prepare('SELECT ref FROM bookings WHERE ref = ?');
+    $st->execute([$ref]);
+    $found = $st->fetch();
+    $row['bookingRef'] = $found ? $found['ref'] : ($ref !== '' ? $ref : null);
+  }
+  return $row;
+}
+
+/** The B2B commission field of older admin versions' New / Edit booking form: create, change or
+ *  remove (at 0) the booking's B2B expense. A booking can now have several B2B entries (added with
+ *  Expense on the booking page); then they're left as they are, so none is overwritten or lost.
+ *  $ref must be the booking's own ref. */
 function sync_b2b_expense(string $ref, string $villa, int $commission): void {
   $pdo = db();
-  $st = $pdo->prepare("SELECT id FROM expenses WHERE booking_ref = ? AND category = 'B2B Commission' LIMIT 1");
+  $st = $pdo->prepare("SELECT id FROM expenses WHERE booking_ref = ? AND category = 'B2B Commission'");
   $st->execute([$ref]);
-  $existing = $st->fetch();
+  $rows = $st->fetchAll();
+  if (count($rows) > 1) return;
+  $existing = $rows[0] ?? null;
   if ($commission > 0) {
     $room = primary_room($villa);
     if ($existing) {
-      $pdo->prepare('UPDATE expenses SET villa = ?, amount = ? WHERE id = ?')->execute([$room, $commission, $existing['id']]);
+      $pdo->prepare("UPDATE expenses SET booking_ref = ?, category = 'B2B Commission', villa = ?, amount = ? WHERE id = ?")
+          ->execute([$ref, $room, $commission, $existing['id']]);
     } else {
       $pdo->prepare("INSERT INTO expenses (id, date, category, villa, booking_ref, description, amount)
                      VALUES (?, CURDATE(), 'B2B Commission', ?, ?, ?, ?)")
@@ -240,10 +293,7 @@ function bootstrap_payload(): array {
   }
   $bk = array_map(fn($b) => booking_shape($b, $byRef[$b['ref']] ?? []), $bookings);
 
-  $expenses = array_map(fn($e) => [
-    'id' => $e['id'], 'date' => $e['date'], 'category' => $e['category'], 'villa' => $e['villa'],
-    'bookingRef' => $e['booking_ref'] ?? null, 'description' => $e['description'], 'amount' => (int)$e['amount'],
-  ], $pdo->query('SELECT * FROM expenses ORDER BY date DESC, id DESC')->fetchAll());
+  $expenses = array_map(fn($e) => expense_shape($e), $pdo->query('SELECT * FROM expenses ORDER BY date DESC, id DESC')->fetchAll());
 
   $users = array_map(fn($u) => public_user($u), $pdo->query('SELECT * FROM users ORDER BY id ASC')->fetchAll());
 
@@ -254,15 +304,12 @@ function bootstrap_payload(): array {
 
   $inv = $pdo->query('SELECT * FROM invoice_settings WHERE id = 1')->fetch();
   $invoice = $inv
-    ? ['prefix' => $inv['prefix'], 'next' => (int)$inv['next'], 'padding' => (int)$inv['padding'], 'terms' => $inv['terms']]
-    : ['prefix' => 'KV-', 'next' => 1, 'padding' => 5, 'terms' => ''];
+    ? public_invoice($inv)
+    : ['prefix' => 'KV-', 'next' => 1, 'padding' => 5, 'terms' => '', 'showPayments' => false, 'showB2b' => false];
 
   $overrides = [];
   foreach ($pdo->query('SELECT * FROM room_overrides')->fetchAll() as $o) {
-    $entry = [];
-    if ($o['base_rate'] !== null) $entry['baseRate'] = (int)$o['base_rate'];
-    if ($o['notes'] !== null)     $entry['notes'] = $o['notes'];
-    $overrides[$o['villa']] = $entry;
+    $overrides[$o['villa']] = public_override($o);
   }
 
   return [

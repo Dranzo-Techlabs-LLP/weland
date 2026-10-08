@@ -4,7 +4,7 @@
 //  For local `npm run dev` against the live server, set
 //  VITE_API_BASE=https://welandresort.com/api in a .env.development.local file.
 // ------------------------------------------------------------------
-import type { AppData, Booking, BookingStatus, Expense, InvoiceSettings, Payment, Role, User } from '../types'
+import type { AppData, Booking, BookingStatus, Expense, InvoiceSettings, Payment, Role, RoomOverride, User } from '../types'
 
 const ENV = (import.meta as unknown as { env?: Record<string, string> }).env ?? {}
 const API_BASE = (ENV.VITE_API_BASE || '/api').replace(/\/$/, '')
@@ -123,6 +123,6 @@ export const api = {
 
   saveInvoice: (s: Partial<InvoiceSettings>) =>
     req<{ invoice: InvoiceSettings }>('/invoice', { method: 'PUT', body: s }),
-  saveVillaOverride: (name: string, data: { baseRate?: number; notes?: string }) =>
-    req<{ ok: boolean }>(`/rooms/${encodeURIComponent(name)}/override`, { method: 'PUT', body: data }),
+  saveVillaOverride: (name: string, data: RoomOverride) =>
+    req<{ ok: boolean; override?: RoomOverride }>(`/rooms/${encodeURIComponent(name)}/override`, { method: 'PUT', body: data }),
 }

@@ -1,8 +1,9 @@
 -- ==================================================================
 --  Weland — database update for the booking features
 --  (several rooms / Full Property, adults + kids, notes, alternate
---   mobile, payment method + reference, advance payment) and the
---  user's room
+--   mobile, payment method + reference, advance payment), the user's
+--  room, room capacity (Party Hall), and the invoice's "show on invoice"
+--  options (payment entries, B2B commission)
 --
 --  phpMyAdmin → click the "weland" database → SQL tab → paste all of
 --  this → Go.
@@ -70,4 +71,26 @@ PREPARE step FROM @sql; EXECUTE step; DEALLOCATE PREPARE step;
 SET @add = (SELECT COUNT(*) = 0 FROM information_schema.COLUMNS
              WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'villa');
 SET @sql = IF(@add, 'ALTER TABLE users ADD COLUMN villa VARCHAR(255) NULL AFTER role', 'DO 0');
+PREPARE step FROM @sql; EXECUTE step; DEALLOCATE PREPARE step;
+
+-- Rooms: capacity that can be changed on the Rooms page (the Party Hall)
+SET @add = (SELECT COUNT(*) = 0 FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'room_overrides' AND COLUMN_NAME = 'min_guests');
+SET @sql = IF(@add, 'ALTER TABLE room_overrides ADD COLUMN min_guests INT NULL AFTER notes', 'DO 0');
+PREPARE step FROM @sql; EXECUTE step; DEALLOCATE PREPARE step;
+SET @add = (SELECT COUNT(*) = 0 FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'room_overrides' AND COLUMN_NAME = 'max_guests');
+SET @sql = IF(@add, 'ALTER TABLE room_overrides ADD COLUMN max_guests INT NULL AFTER min_guests', 'DO 0');
+PREPARE step FROM @sql; EXECUTE step; DEALLOCATE PREPARE step;
+
+-- Invoice settings: print every payment entry on the invoice (off = as before)
+SET @add = (SELECT COUNT(*) = 0 FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'invoice_settings' AND COLUMN_NAME = 'show_payments');
+SET @sql = IF(@add, 'ALTER TABLE invoice_settings ADD COLUMN show_payments TINYINT(1) NOT NULL DEFAULT 0 AFTER terms', 'DO 0');
+PREPARE step FROM @sql; EXECUTE step; DEALLOCATE PREPARE step;
+
+-- Invoice settings: print the B2B commission on the invoice (off = as before)
+SET @add = (SELECT COUNT(*) = 0 FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'invoice_settings' AND COLUMN_NAME = 'show_b2b');
+SET @sql = IF(@add, 'ALTER TABLE invoice_settings ADD COLUMN show_b2b TINYINT(1) NOT NULL DEFAULT 0 AFTER show_payments', 'DO 0');
 PREPARE step FROM @sql; EXECUTE step; DEALLOCATE PREPARE step;

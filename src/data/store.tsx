@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { ROOMS } from '../lib/config'
 import { api, ApiError, setToken, type BookingWrite, type UserWrite } from '../lib/api'
 import { useAuth } from '../auth/AuthContext'
-import type { AppData, Booking, BookingStatus, Expense, InvoiceSettings, Payment } from '../types'
+import type { AppData, Booking, BookingStatus, Expense, InvoiceSettings, Payment, RoomOverride } from '../types'
 
 export function paidOf(b: Booking): number {
   return b.payments.reduce((s, p) => s + (p.kind === 'refund' ? -p.amount : p.amount), 0)
@@ -12,6 +12,12 @@ export function balanceOf(b: Booking): number {
 }
 /** Category that represents B2B partner commission (excluded from "operating" expenses). */
 export const B2B_CATEGORY = 'B2B Commission'
+
+/** A booking's B2B-commission rows. Refs match regardless of letter case, as in the database. */
+export function b2bRowsOf(expenses: Expense[], ref: string): Expense[] {
+  const r = ref.trim().toLowerCase()
+  return expenses.filter((e) => e.category === B2B_CATEGORY && e.bookingRef?.trim().toLowerCase() === r)
+}
 
 /** Empty dataset used before bootstrap resolves / after logout. */
 function emptyData(): AppData {
@@ -39,6 +45,7 @@ interface StoreValue {
   setUserActive: (id: string, active: boolean) => Promise<void>
   saveRoleRights: (roleId: string, rights: string[]) => Promise<void>
   addRole: (name: string) => Promise<void>
+  /** Throws on failure so the Invoice settings page can show the message. */
   saveInvoice: (s: Partial<InvoiceSettings>) => Promise<void>
   createBooking: (input: BookingWrite) => Promise<string>
   updateBooking: (ref: string, fields: BookingWrite) => Promise<void>
@@ -47,7 +54,8 @@ interface StoreValue {
   updatePayment: (id: string, p: Omit<Payment, 'id'>) => Promise<void>
   deletePayment: (id: string) => Promise<void>
   setBookingStatus: (ref: string, status: BookingStatus) => Promise<void>
-  saveVillaOverride: (name: string, data: { baseRate?: number; notes?: string }) => Promise<void>
+  /** Throws on failure so the Rooms form can show the message. */
+  saveVillaOverride: (name: string, data: RoomOverride) => Promise<void>
 }
 
 const StoreContext = createContext<StoreValue | undefined>(undefined)
@@ -61,7 +69,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const load = useCallback(() => {
     setLoading(true)
     setError(null)
-    api.bootstrap()
+    return api.bootstrap()
       .then((d) => setData({ ...emptyData(), ...d }))
       .catch((e: unknown) => {
         if (e instanceof ApiError && e.status === 401) {
@@ -136,10 +144,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setData((d) => ({ ...d, roles: [...d.roles, role] }))
   }), [guard])
 
-  const saveInvoice = useCallback((s: Partial<InvoiceSettings>) => guard(async () => {
+  const saveInvoice = useCallback(async (s: Partial<InvoiceSettings>) => {
     const { invoice } = await api.saveInvoice(s)
-    setData((d) => ({ ...d, invoice }))
-  }), [guard])
+    setData((d) => ({ ...d, invoice: { ...d.invoice, ...invoice } }))
+    // An older server saves the rest but doesn't know the "show on invoice" options
+    if ((s.showPayments !== undefined && invoice.showPayments === undefined) || (s.showB2b !== undefined && invoice.showB2b === undefined)) {
+      throw new Error("The settings were saved, but not the 'Show on invoice' options. The server needs the latest update (api/index.php and api/lib.php).")
+    }
+  }, [])
 
   const replaceBooking = (booking: Booking) =>
     setData((d) => ({ ...d, bookings: d.bookings.map((b) => (b.ref === booking.ref ? booking : b)) }))
@@ -164,16 +176,27 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setData((d) => ({ ...d, bookings: d.bookings.map((b) => (b.ref === ref ? booking : b)) }))
   }), [guard])
 
-  const saveVillaOverride = useCallback((name: string, patch: { baseRate?: number; notes?: string }) => guard(async () => {
-    await api.saveVillaOverride(name, patch)
-    setData((d) => ({ ...d, villaOverrides: { ...d.villaOverrides, [name]: { ...d.villaOverrides[name], ...patch } } }))
-  }), [guard])
+  // Rooms: show what the server stored. An older server doesn't send it back
+  // and only saves the base rate and notes, so a capacity change is reported.
+  const saveVillaOverride = useCallback(async (name: string, patch: RoomOverride) => {
+    const res = await api.saveVillaOverride(name, patch)
+    if (res.override) {
+      const saved = res.override
+      setData((d) => ({ ...d, villaOverrides: { ...d.villaOverrides, [name]: saved } }))
+      return
+    }
+    const { minGuests, maxGuests, ...rest } = patch
+    setData((d) => ({ ...d, villaOverrides: { ...d.villaOverrides, [name]: { ...d.villaOverrides[name], ...rest } } }))
+    if (minGuests !== undefined || maxGuests !== undefined) {
+      throw new Error("Base rate and notes were saved, but the capacity wasn't. The server needs the latest update (api/index.php and api/lib.php).")
+    }
+  }, [])
 
   const createBooking = useCallback(async (input: BookingWrite) => {
     try {
       const { ref, booking } = await api.createBooking(input)
       setData((d) => ({ ...d, bookings: [booking, ...d.bookings], invoice: { ...d.invoice, next: d.invoice.next + 1 } }))
-      load() // pull in the linked B2B expense, if any
+      await load() // pull in the linked B2B expense before the booking page opens
       return ref
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not create the booking.')
@@ -184,7 +207,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const updateBooking = useCallback((ref: string, fields: BookingWrite) => guard(async () => {
     const { booking } = await api.updateBooking(ref, fields)
     setData((d) => ({ ...d, bookings: d.bookings.map((b) => (b.ref === ref ? booking : b)) }))
-    load() // refresh payments/expenses (B2B commission) touched by the edit
+    await load() // refresh payments/expenses (B2B commission) before the booking page opens
   }), [guard, load])
 
   const deleteBooking = useCallback((ref: string) => guard(async () => {

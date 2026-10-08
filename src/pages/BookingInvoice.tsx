@@ -1,7 +1,7 @@
 import { useEffect, type ReactNode } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { ArrowLeft, Globe, Instagram, Mail, MessageCircle, Phone, Printer } from 'lucide-react'
-import { balanceOf, paidOf, useStore } from '../data/store'
+import { b2bRowsOf, balanceOf, paidOf, useStore } from '../data/store'
 import { RESORT } from '../lib/config'
 import { fmtDate, formatINR, parseISO, toISO } from '../lib/format'
 import { primaryBtnCls } from '../components/styles'
@@ -60,6 +60,14 @@ export function BookingInvoice() {
   const nightCount = nights(booking.checkIn, booking.checkOut)
   const issued = fmtDate(toISO(new Date()))
   const terms = data.invoice.terms
+  // Optional sections (Invoice settings -> Show on invoice)
+  const payments = data.invoice.showPayments
+    ? [...booking.payments].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0))
+    : []
+  const b2bEntries = data.invoice.showB2b
+    ? b2bRowsOf(data.expenses, booking.ref).sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0))
+    : []
+  const b2bTotal = b2bEntries.reduce((s, e) => s + e.amount, 0)
 
   return (
     <div className="mx-auto max-w-2xl">
@@ -117,6 +125,34 @@ export function BookingInvoice() {
           </tbody>
         </table>
 
+        {payments.length > 0 && (
+          <div className="mt-6 print:break-inside-avoid">
+            <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Payments</div>
+            <table className="mt-2 w-full border-collapse text-sm">
+              <thead>
+                <tr className="border-y border-slate-200 text-xs uppercase tracking-wide text-slate-500">
+                  <th className="py-2 text-left font-semibold">Date</th>
+                  <th className="py-2 text-left font-semibold">Type</th>
+                  <th className="py-2 text-left font-semibold">Method</th>
+                  <th className="py-2 text-left font-semibold">Reference</th>
+                  <th className="py-2 text-right font-semibold">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {payments.map((p) => (
+                  <tr key={p.id} className="border-b border-slate-100">
+                    <td className="nums py-2 text-slate-700">{fmtDate(p.date)}</td>
+                    <td className="py-2 capitalize text-slate-700">{p.advance ? 'advance' : p.kind}</td>
+                    <td className="py-2 text-slate-700">{p.method || '—'}</td>
+                    <td className="py-2 text-slate-700">{p.reference || '—'}</td>
+                    <td className="nums py-2 text-right text-slate-900">{p.kind === 'refund' ? '−' : ''}{formatINR(p.amount)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
         <div className="ml-auto mt-4 w-full max-w-xs">
           <Row label="Total" value={formatINR(booking.total)} />
           <Row label="Paid" value={formatINR(paid)} />
@@ -124,6 +160,27 @@ export function BookingInvoice() {
             <Row label="Balance due" value={formatINR(balance)} strong />
           </div>
         </div>
+
+        {b2bEntries.length > 0 && (
+          <div className="mt-6 print:break-inside-avoid">
+            <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">B2B commission</div>
+            <table className="mt-2 w-full border-collapse text-sm">
+              <tbody>
+                {b2bEntries.map((e) => (
+                  <tr key={e.id} className="border-b border-slate-100">
+                    <td className="nums w-28 py-2 text-slate-700">{fmtDate(e.date)}</td>
+                    <td className="py-2 text-slate-700">{e.description}</td>
+                    <td className="nums py-2 text-right text-slate-900">−{formatINR(e.amount)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div className="ml-auto mt-2 w-full max-w-xs">
+              {b2bEntries.length > 1 && <Row label="Total B2B commission" value={`−${formatINR(b2bTotal)}`} />}
+              <Row label="Net after B2B commission" value={formatINR(paid - b2bTotal)} strong />
+            </div>
+          </div>
+        )}
 
         {terms && (
           <div className="mt-8 border-t border-slate-200 pt-4">

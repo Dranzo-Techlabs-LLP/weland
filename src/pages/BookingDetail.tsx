@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, LogIn, LogOut, Pencil, Plus, Receipt, RotateCcw, Trash2 } from 'lucide-react'
 import { can, useAuth } from '../auth/AuthContext'
-import { B2B_CATEGORY, balanceOf, paidOf, useStore } from '../data/store'
+import { B2B_CATEGORY, b2bRowsOf, balanceOf, paidOf, useStore } from '../data/store'
 import { primaryRoom } from '../lib/config'
 import { fmtDate, formatINR, parseISO, toISO } from '../lib/format'
 import { EXPENSE_CATEGORIES, PAYMENT_METHODS } from '../lib/permissions'
@@ -39,16 +39,17 @@ type EntryKind = Payment['kind'] | 'b2b'
 type PaymentDraft = { kind: EntryKind; date: string; amount: string; method: string; reference: string; note: string; advance: boolean }
 const KIND_LABEL: Record<EntryKind, string> = { payment: 'Payment', refund: 'Refund', b2b: 'B2B commission' }
 const b2bDefaultNote = (ref: string) => `B2B commission · ${ref}`
-/** One line of the payment ledger: a payment / refund, or the booking's B2B commission. */
+/** One line of the payment ledger: a payment / refund, or one of the booking's B2B commission entries. */
 type LedgerRow = { id: string; date: string; payment?: Payment; expense?: Expense }
 
-/** Add / edit a payment or refund, the booking's advance (always a payment), or its B2B commission
- *  (the booking's one linked expense, so it takes a note instead of method / reference). */
-function PaymentModal({ title, initial, kinds, total, existingB2b, onSave, onClose }: {
+/** Add / edit a payment or refund, the booking's advance (always a payment), or edit one B2B
+ *  commission entry (a linked expense, so it takes a note instead of method / reference).
+ *  B2B commission is added with Expense, not here. */
+function PaymentModal({ title, initial, kinds, total, otherB2b = 0, onSave, onClose }: {
   title: string; initial: PaymentDraft
   total: number // the booking total, for the B2B commission percentages
+  otherB2b?: number // the booking's other B2B entries (net revenue preview)
   kinds: EntryKind[] // Type choices; with a single one the Type field is hidden
-  existingB2b?: Expense // when adding: the booking's B2B commission, if it already has one
   onSave: (d: PaymentDraft) => Promise<void>; onClose: () => void
 }) {
   const [f, setF] = useState(initial)
@@ -56,13 +57,11 @@ function PaymentModal({ title, initial, kinds, total, existingB2b, onSave, onClo
   const [busy, setBusy] = useState(false)
   const set = <K extends keyof PaymentDraft>(k: K, v: PaymentDraft[K]) => setF((x) => ({ ...x, [k]: v }))
   const isB2b = f.kind === 'b2b'
-  const takenB2b = isB2b ? existingB2b : undefined
   const noteField = (
     <Field label="Note (optional)"><input className={`${inputCls} w-full`} value={f.note} onChange={(e) => set('note', e.target.value)} placeholder="Partner, how it was paid…" /></Field>
   )
   async function save() {
-    if (takenB2b) return
-    if (!(Number(f.amount) > 0)) { setErr('Enter an amount.'); return }
+    if (!(Math.round(Number(f.amount)) >= 1)) { setErr('Enter an amount of at least ₹1.'); return }
     setBusy(true)
     await onSave(f)
     setBusy(false)
@@ -84,7 +83,7 @@ function PaymentModal({ title, initial, kinds, total, existingB2b, onSave, onClo
         {isB2b ? (
           <>
             {kinds.length === 1 && noteField}
-            <div className="col-span-2"><B2bCommissionBlock total={total} value={f.amount} onChange={(v) => set('amount', v)} autoFocus /></div>
+            <div className="col-span-2"><B2bCommissionBlock total={total} value={f.amount} onChange={(v) => set('amount', v)} autoFocus others={otherB2b} /></div>
             {kinds.length > 1 && <div className="col-span-2">{noteField}</div>}
           </>
         ) : (
@@ -101,40 +100,32 @@ function PaymentModal({ title, initial, kinds, total, existingB2b, onSave, onClo
           </>
         )}
       </div>
-      {takenB2b && (
-        <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-[13px] text-amber-800">
-          This booking already has a B2B commission of <span className="nums font-semibold">{formatINR(takenB2b.amount)}</span>.
-          To change it, use ✎ on its row in the payment ledger.
-        </p>
-      )}
       {err && <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-[13px] text-red-700">{err}</p>}
       <div className="mt-6 flex justify-end gap-2">
         <button onClick={onClose} disabled={busy} className={secondaryBtnCls}>Cancel</button>
-        <button onClick={save} disabled={busy || !!takenB2b} className={`${primaryBtnCls} disabled:cursor-not-allowed disabled:opacity-60`}>{busy ? 'Saving…' : 'Save'}</button>
+        <button onClick={save} disabled={busy} className={`${primaryBtnCls} disabled:cursor-not-allowed disabled:opacity-60`}>{busy ? 'Saving…' : 'Save'}</button>
       </div>
     </Modal>
   )
 }
 
-/** Add an expense linked to this booking. B2B commission is one expense per booking
- *  (the same one New / Edit booking set), so a second one is pointed to its ledger row. */
+/** Add an expense linked to this booking. B2B Commission is where the booking's B2B commission
+ *  is entered; each one is a separate entry in the payment ledger (a booking can have several). */
 function ExpenseModal({ booking, onClose }: { booking: Booking; onClose: () => void }) {
   const { data, addExpense } = useStore()
-  const existingB2b = data.expenses.find((e) => e.bookingRef === booking.ref && e.category === B2B_CATEGORY)
+  const b2bRows = b2bRowsOf(data.expenses, booking.ref)
   const [f, setF] = useState({ date: todayISO(), category: EXPENSE_CATEGORIES.find((c) => c !== B2B_CATEGORY) ?? EXPENSE_CATEGORIES[0], amount: '', description: '' })
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
   const isB2b = f.category === B2B_CATEGORY
-  const takenB2b = isB2b ? existingB2b : undefined
   async function save() {
-    if (takenB2b) return
-    if (!(Number(f.amount) > 0)) { setErr('Enter an amount.'); return }
+    if (!(Math.round(Number(f.amount)) >= 1)) { setErr('Enter an amount of at least ₹1.'); return }
     setBusy(true)
     await addExpense({
       date: f.date, category: f.category,
-      villa: isB2b ? primaryRoom(booking.villa) : booking.villa, // same room the booking form books its B2B under
+      villa: isB2b ? primaryRoom(booking.villa) : booking.villa, // B2B is booked under the booking's first room
       bookingRef: booking.ref,
-      description: f.description.trim() || (isB2b ? `B2B commission · ${booking.ref}` : ''),
+      description: f.description.trim() || (isB2b ? b2bDefaultNote(booking.ref) : ''),
       amount: Math.round(Number(f.amount)),
     })
     setBusy(false)
@@ -152,21 +143,21 @@ function ExpenseModal({ booking, onClose }: { booking: Booking; onClose: () => v
         </Field>
         <div className="col-span-2">
           {isB2b
-            ? <B2bCommissionBlock total={booking.total} value={f.amount} onChange={(v) => setF({ ...f, amount: v })} />
+            ? <B2bCommissionBlock total={booking.total} value={f.amount} onChange={(v) => setF({ ...f, amount: v })} others={b2bRows.reduce((s, e) => s + e.amount, 0)} />
             : <Field label="Amount (₹)"><input type="number" min={0} className={`${inputCls} w-full`} value={f.amount} onChange={(e) => setF({ ...f, amount: e.target.value })} autoFocus /></Field>}
         </div>
         <div className="col-span-2"><Field label="Description"><textarea rows={2} className={textareaCls} value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} /></Field></div>
       </div>
-      {takenB2b && (
-        <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-[13px] text-amber-800">
-          This booking already has a B2B commission of <span className="nums font-semibold">{formatINR(takenB2b.amount)}</span>.
-          To change it, use ✎ on its row in the payment ledger.
+      {isB2b && b2bRows.length > 0 && (
+        <p className="mt-3 rounded-lg bg-violet-50 px-3 py-2 text-[13px] text-violet-800">
+          This booking already has B2B commission of <span className="nums font-semibold">{formatINR(b2bRows.reduce((s, e) => s + e.amount, 0))}</span>
+          {' '}({b2bRows.length} {b2bRows.length === 1 ? 'entry' : 'entries'}). Saving adds another entry; to change one, use ✎ on its row in the payment ledger.
         </p>
       )}
       {err && <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-[13px] text-red-700">{err}</p>}
       <div className="mt-6 flex justify-end gap-2">
         <button onClick={onClose} disabled={busy} className={secondaryBtnCls}>Cancel</button>
-        <button onClick={save} disabled={busy || !!takenB2b} className={`${primaryBtnCls} disabled:cursor-not-allowed disabled:opacity-60`}>{busy ? 'Saving…' : 'Save expense'}</button>
+        <button onClick={save} disabled={busy} className={`${primaryBtnCls} disabled:cursor-not-allowed disabled:opacity-60`}>{busy ? 'Saving…' : 'Save expense'}</button>
       </div>
     </Modal>
   )
@@ -176,7 +167,7 @@ export function BookingDetail() {
   const { ref } = useParams<{ ref: string }>()
   const navigate = useNavigate()
   const { user } = useAuth()
-  const { data, addPayment, updatePayment, deletePayment, addExpense, updateExpense, deleteExpense, setBookingStatus } = useStore()
+  const { data, addPayment, updatePayment, deletePayment, updateExpense, deleteExpense, setBookingStatus } = useStore()
   const booking = data.bookings.find((b) => b.ref === ref)
 
   const [payModal, setPayModal] = useState<
@@ -197,7 +188,7 @@ export function BookingDetail() {
 
   const paid = paidOf(booking)
   const balance = balanceOf(booking)
-  const b2bExpenses = data.expenses.filter((e) => e.bookingRef === booking.ref && e.category === B2B_CATEGORY)
+  const b2bExpenses = b2bRowsOf(data.expenses, booking.ref)
   const b2b = b2bExpenses.reduce((s, e) => s + e.amount, 0)
   const nights = Math.max(1, Math.round((parseISO(booking.checkOut).getTime() - parseISO(booking.checkIn).getTime()) / 86400000))
   const adults = booking.adults ?? booking.guests
@@ -205,11 +196,11 @@ export function BookingDetail() {
   const canRecord = can(user, 'record_payments')
   const canEdit = can(user, 'edit_bookings')
   const canExpense = can(user, 'edit_expenses')
-  // Payments, refunds and the B2B commission, oldest first
-  const ledger: LedgerRow[] = [
+  // Payments, refunds and the B2B commission entries, oldest first (on the same date, B2B first)
+  const ledger = ([
     ...booking.payments.map((p) => ({ id: p.id, date: p.date, payment: p })),
     ...b2bExpenses.map((e) => ({ id: e.id, date: e.date, expense: e })),
-  ].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0))
+  ] as LedgerRow[]).sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : (a.expense ? 0 : 1) - (b.expense ? 0 : 1)))
   const showActions = canRecord || canExpense
   const advance = booking.payments.find((p) => p.advance)
 
@@ -228,17 +219,17 @@ export function BookingDetail() {
   async function saveEntry(d: PaymentDraft, payment?: Payment, expense?: Expense) {
     const amount = Math.round(Number(d.amount))
     if (d.kind === 'b2b') {
-      const fields = {
-        date: d.date, category: B2B_CATEGORY, villa: expense?.villa ?? primaryRoom(booking!.villa), bookingRef: booking!.ref,
-        description: d.note.trim() || b2bDefaultNote(booking!.ref), amount,
-      }
-      if (expense) await updateExpense(expense.id, fields)
-      else await addExpense(fields)
+      // Edit this one B2B entry (the booking's other entries stay as they are)
+      if (expense) await updateExpense(expense.id, { ...expense, date: d.date, description: d.note.trim() || b2bDefaultNote(booking!.ref), amount })
       return
     }
-    const p = { kind: d.advance ? ('payment' as const) : d.kind, date: d.date, amount, method: d.method, reference: d.reference.trim(), advance: d.advance }
-    if (payment) await updatePayment(payment.id, p)
-    else await addPayment(booking!.ref, p)
+    if (amount > 0) {
+      const p = { kind: d.advance ? ('payment' as const) : d.kind, date: d.date, amount, method: d.method, reference: d.reference.trim(), advance: d.advance }
+      const unchanged = payment && p.kind === payment.kind && p.date === payment.date && amount === payment.amount
+        && p.method === (payment.method || 'Cash') && p.reference === (payment.reference || '')
+      if (payment) { if (!unchanged) await updatePayment(payment.id, p) }
+      else await addPayment(booking!.ref, p)
+    }
   }
   async function confirmDelete() {
     if (!delRow) return
@@ -316,7 +307,10 @@ export function BookingDetail() {
           <div className="mt-4 space-y-3 text-sm">
             <div className="flex justify-between gap-4"><span className="text-slate-500">Total</span><span className="nums font-semibold text-slate-900">{formatINR(booking.total)}</span></div>
             <div className="flex justify-between gap-4"><span className="text-slate-500">Received <span className="text-slate-400">(incl. advance)</span></span><span className="nums font-medium text-emerald-700">{formatINR(paid)}</span></div>
-            <div className="flex justify-between gap-4"><span className="text-slate-500">B2B commission</span><span className="nums font-medium text-violet-600">{b2b ? `−${formatINR(b2b)}` : '—'}</span></div>
+            <div className="flex justify-between gap-4">
+              <span className="text-slate-500">B2B commission{b2bExpenses.length > 1 && <span className="text-slate-400"> ({b2bExpenses.length} entries)</span>}</span>
+              <span className="nums font-medium text-violet-600">{b2b ? `−${formatINR(b2b)}` : '—'}</span>
+            </div>
           </div>
           <div className="my-4 border-t border-slate-100" />
           <div className="flex items-baseline justify-between gap-4">
@@ -393,7 +387,7 @@ export function BookingDetail() {
           const e = payModal.expense
           return (
             <PaymentModal
-              title="Edit B2B commission" kinds={['b2b']} total={booking.total}
+              title="Edit B2B commission" kinds={['b2b']} total={booking.total} otherB2b={b2b - e.amount}
               initial={{ kind: 'b2b', date: e.date, amount: String(e.amount), method: 'Cash', reference: '', note: e.description === b2bDefaultNote(booking.ref) ? '' : e.description, advance: false }}
               onSave={(d) => saveEntry(d, undefined, e)}
               onClose={() => setPayModal(null)}
@@ -402,11 +396,11 @@ export function BookingDetail() {
         }
         const existing = payModal.mode === 'add' ? undefined : payModal.payment
         const isAdvance = payModal.mode === 'advance'
-        const kinds: EntryKind[] = isAdvance ? ['payment'] : existing ? ['payment', 'refund'] : canExpense ? ['payment', 'refund', 'b2b'] : ['payment', 'refund']
+        const kinds: EntryKind[] = isAdvance ? ['payment'] : ['payment', 'refund']
         return (
           <PaymentModal
             title={isAdvance ? (existing ? 'Edit advance' : 'Add advance') : existing ? 'Edit payment' : payModal.mode === 'add' && payModal.kind === 'refund' ? 'Record refund' : 'Record payment'}
-            kinds={kinds} total={booking.total} existingB2b={b2bExpenses[0]}
+            kinds={kinds} total={booking.total}
             initial={existing
               ? { kind: existing.kind, date: existing.date, amount: String(existing.amount), method: existing.method || 'Cash', reference: existing.reference || '', note: '', advance: isAdvance }
               : { kind: payModal.mode === 'add' ? payModal.kind : 'payment', date: isAdvance && booking.createdAt ? booking.createdAt.slice(0, 10) : todayISO(), amount: '', method: 'Cash', reference: '', note: '', advance: isAdvance }}

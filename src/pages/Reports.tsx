@@ -3,7 +3,7 @@ import { CheckCircle2, Download, Eye, FileText, X } from 'lucide-react'
 import { B2B_CATEGORY, paidOf, useStore } from '../data/store'
 import { bookingHasRoom, ROOM_OPTIONS } from '../lib/config'
 import { formatINR, TODAY, TODAY_ISO, toISO } from '../lib/format'
-import { BOOKING_STATUSES, PAYMENT_METHODS } from '../lib/permissions'
+import { BOOKING_STATUSES, EXPENSE_CATEGORIES, PAYMENT_METHODS } from '../lib/permissions'
 import { inputCls, primaryBtnCls, secondaryBtnCls, selectCls } from '../components/styles'
 import type { AppData, Booking } from '../types'
 
@@ -45,28 +45,29 @@ function build(type: ReportType, data: AppData, from: string, to: string, villa:
       .map((e) => [e.date, e.category, e.villa, e.bookingRef ?? '—', e.description, e.amount])
     return { columns: ['Date', 'Category', 'Room', 'Booking', 'Description', 'Amount'], rows, money: [5] }
   }
-  // combined cash book
-  interface Entry { date: string; type: string; detail: string; inAmt: number; outAmt: number }
+  // combined cash book: every money line with its details
+  interface Entry { date: string; type: string; category: string; room: string; booking: string; description: string; method: string; inAmt: number; outAmt: number }
   const entries: Entry[] = []
   for (const b of data.bookings) {
     if (!villaOk(b.villa)) continue
     for (const p of b.payments) {
       if (!inRange(p.date)) continue
-      if (p.kind === 'payment') entries.push({ date: p.date, type: 'Payment', detail: `${b.ref} · ${b.guest}`, inAmt: p.amount, outAmt: 0 })
-      else entries.push({ date: p.date, type: 'Refund', detail: `${b.ref} · ${b.guest}`, inAmt: 0, outAmt: p.amount })
+      const line = { date: p.date, category: '—', room: b.villa, booking: b.ref, description: b.guest, method: p.method || '—' }
+      if (p.kind === 'payment') entries.push({ ...line, type: p.advance ? 'Advance' : 'Payment', inAmt: p.amount, outAmt: 0 })
+      else entries.push({ ...line, type: 'Refund', inAmt: 0, outAmt: p.amount })
     }
   }
   for (const e of data.expenses) {
     if (!villaOk(e.villa) || !inRange(e.date)) continue
-    entries.push({ date: e.date, type: e.category, detail: `${e.villa}${e.description ? ' · ' + e.description : ''}`, inAmt: 0, outAmt: e.amount })
+    entries.push({ date: e.date, type: 'Expense', category: e.category, room: e.villa, booking: e.bookingRef || '—', description: e.description || '—', method: '—', inAmt: 0, outAmt: e.amount })
   }
-  entries.sort((a, b) => (a.date < b.date ? -1 : 1))
+  entries.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0))
   let bal = 0
   const rows = entries.map((e) => {
     bal += e.inAmt - e.outAmt
-    return [e.date, e.type, e.detail, e.inAmt || '', e.outAmt || '', bal]
+    return [e.date, e.type, e.category, e.room, e.booking, e.description, e.method, e.inAmt || '', e.outAmt || '', bal]
   })
-  return { columns: ['Date', 'Type', 'Detail', 'In', 'Out', 'Balance'], rows, money: [3, 4, 5] }
+  return { columns: ['Date', 'Type', 'Category', 'Room', 'Booking', 'Description', 'Method', 'In', 'Out', 'Balance'], rows, money: [7, 8, 9] }
 }
 
 /** Credited (money in) / debited (money out) for the summary cards, from the currently shown rows. */
@@ -74,16 +75,18 @@ function summarize(type: ReportType, rows: (string | number)[][]) {
   const col = (i: number) => rows.reduce((s, r) => s + (typeof r[i] === 'number' ? r[i] : 0), 0)
   if (type === 'bookings') return { credited: col(9), debited: 0 }
   if (type === 'expenses') return { credited: 0, debited: col(5) }
-  if (type === 'combined') return { credited: col(3), debited: col(4) }
+  if (type === 'combined') return { credited: col(7), debited: col(8) }
   const credited = rows.reduce((s, r) => s + (r[4] === 'payment' && typeof r[6] === 'number' ? r[6] : 0), 0)
   const debited = rows.reduce((s, r) => s + (r[4] === 'refund' && typeof r[6] === 'number' ? r[6] : 0), 0)
   return { credited, debited }
 }
 
-/** A column filters by dropdown (Room/Status/Method), free text (with !exclude), or not at all (money columns). */
-function filterKind(col: string, idx: number, money: number[]): 'room' | 'status' | 'method' | 'none' | 'text' {
+/** A column filters by dropdown (Room/Status/Method/Type/Category), free text (with !exclude), or not at all (money columns). */
+function filterKind(col: string, idx: number, money: number[]): 'room' | 'status' | 'method' | 'type' | 'category' | 'none' | 'text' {
   if (col === 'Room') return 'room'
   if (col === 'Status') return 'status'
+  if (col === 'Type') return 'type'
+  if (col === 'Category') return 'category'
   if (col === 'Payment method' || col === 'Method') return 'method'
   if (money.includes(idx)) return 'none'
   return 'text'
@@ -124,6 +127,8 @@ function ReportCard({ title, desc, onPreview, onExport, exportLabel }: { title: 
   )
 }
 
+const COMBINED_TYPES = ['Payment', 'Advance', 'Refund', 'Expense']
+
 function SummaryCard({ label, value, sub, tone }: { label: string; value: string; sub: string; tone: 'green' | 'red' | 'slate' }) {
   const color = tone === 'green' ? 'text-emerald-700' : tone === 'red' ? 'text-red-600' : 'text-slate-900'
   return (
@@ -160,6 +165,7 @@ export function Reports() {
         if (kind === 'room') return !f || f === 'All' || bookingHasRoom(String(row[i]), f)
         if (kind === 'status') return !f || f === 'All' || String(row[i]) === f
         if (kind === 'method') return !f || f === 'All' || String(row[i]).split(', ').includes(f)
+        if (kind === 'type' || kind === 'category') return !f || f === 'All' || String(row[i]) === f
         return matchText(String(row[i]), f)
       }),
     )
@@ -228,15 +234,15 @@ export function Reports() {
                 <button onClick={() => download(`${active.title.toLowerCase().replace(/\s+/g, '-')}_${from}_${to}.csv`, toCsv(report.columns, filtered))} className={primaryBtnCls}><Download size={15} /> Download CSV</button>
               </div>
             </div>
-            <div className="max-h-[520px] overflow-auto border-t border-slate-200">
-              <table className="w-full min-w-[860px] border-collapse text-sm">
+            <div className="max-h-[520px] overflow-auto border-t border-slate-200 print:max-h-none print:overflow-visible">
+              <table className={`w-full ${report.columns.length > 8 ? 'min-w-[1100px]' : 'min-w-[860px]'} border-collapse text-sm print:min-w-0 print:text-xs`}>
                 <thead className="sticky top-0 z-10 bg-slate-50">
                   <tr className="border-b border-slate-200">
                     {report.columns.map((c, i) => (
                       <th key={c} className={`px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-slate-500 ${report.money.includes(i) ? 'text-right' : 'text-left'}`}>{c}</th>
                     ))}
                   </tr>
-                  <tr className="border-b border-slate-200 bg-white">
+                  <tr className="border-b border-slate-200 bg-white print:hidden">
                     {report.columns.map((c, i) => {
                       const kind = filterKind(c, i, report.money)
                       const val = filters[i] ?? ''
@@ -251,6 +257,16 @@ export function Reports() {
                           {kind === 'status' && (
                             <select value={val || 'All'} onChange={(e) => set(e.target.value)} className={filterSelectCls}>
                               <option>All</option>{BOOKING_STATUSES.map((s) => (<option key={s}>{s}</option>))}
+                            </select>
+                          )}
+                          {kind === 'type' && (
+                            <select value={val || 'All'} onChange={(e) => set(e.target.value)} className={filterSelectCls}>
+                              <option>All</option>{COMBINED_TYPES.map((t) => (<option key={t}>{t}</option>))}
+                            </select>
+                          )}
+                          {kind === 'category' && (
+                            <select value={val || 'All'} onChange={(e) => set(e.target.value)} className={filterSelectCls}>
+                              <option>All</option>{EXPENSE_CATEGORIES.map((c) => (<option key={c}>{c}</option>))}
                             </select>
                           )}
                           {kind === 'method' && (

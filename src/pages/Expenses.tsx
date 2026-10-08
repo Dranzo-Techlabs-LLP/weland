@@ -40,8 +40,11 @@ export function Expenses() {
   function save() {
     if (!form.fullProperty && form.rooms.length === 0) { setErr('Pick at least one room (or Full Property).'); return }
     if (!form.amount) { setErr('Enter an amount.'); return }
+    // Link to the booking's own ref when it matches one (in any letter case)
+    const typed = form.bookingRef.trim()
+    const bookingRef = data.bookings.find((b) => b.ref.toLowerCase() === typed.toLowerCase())?.ref ?? typed
     const villa = form.fullProperty ? FULL_PROPERTY : form.rooms.join(', ')
-    const fields = { date: form.date, category: form.category, villa, bookingRef: form.bookingRef.trim(), description: form.description, amount: Math.round(Number(form.amount)) }
+    const fields = { date: form.date, category: form.category, villa, bookingRef, description: form.description, amount: Math.round(Number(form.amount)) }
     if (editId) updateExpense(editId, fields)
     else addExpense(fields)
     setOpen(false)
