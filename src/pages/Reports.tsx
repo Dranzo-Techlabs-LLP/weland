@@ -135,6 +135,17 @@ function csvTotal(type: ReportType, report: Report): (string | number)[] {
 /** File-name part of a report title: letters and digits only, e.g. "payments-refunds". */
 const fileBase = (title: string) => title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
 
+/** Payments & Refunds: a booking's B2B commission is shown once, on its first row, not repeated on each of its payments. */
+function b2bOnce(type: ReportType, rows: (string | number)[][]): (string | number)[][] {
+  if (type !== 'payments') return rows
+  const seen = new Set<string>()
+  return rows.map((r) => {
+    const ref = String(r[1]).toLowerCase()
+    if (!seen.has(ref)) { seen.add(ref); return r }
+    return [...r.slice(0, 7), '']
+  })
+}
+
 const csvHeading = (type: ReportType, title: string) => (type === 'payments' ? 'Payments & Refunds' : title)
 
 function downloadXlsx(name: string, bytes: Uint8Array) {
@@ -200,7 +211,7 @@ export function Reports() {
 
   const filtered = useMemo(() => {
     if (!report) return []
-    return report.rows.filter((row) =>
+    const kept = report.rows.filter((row) =>
       report.columns.every((col, i) => {
         const kind = filterKind(col, i, report.money)
         const f = filters[i] ?? ''
@@ -212,7 +223,8 @@ export function Reports() {
         return matchText(String(row[i]), f)
       }),
     )
-  }, [report, filters])
+    return b2bOnce(active?.type ?? 'bookings', kept)
+  }, [report, filters, active?.type])
 
   const summary = report && active ? summarize(active.type, filtered) : { credited: 0, debited: 0 }
   // Payments & Refunds: the B2B commission of the bookings listed, taken off Total Credited (0 on the other reports)
@@ -233,7 +245,8 @@ export function Reports() {
 
   /** The styled Excel file: "WeLand Resorts", the report name, the table and a Total row. */
   function exportExcel(type: ReportType, title: string, rep?: Report) {
-    const r = rep ?? build(type, data, from, to, villa, basis)
+    const built = build(type, data, from, to, villa, basis)
+    const r = rep ?? { ...built, rows: b2bOnce(type, built.rows) }
     const heading = csvHeading(type, title)
     downloadXlsx(
       `${fileBase(title)}_${from}_${to}.xlsx`,
@@ -242,7 +255,8 @@ export function Reports() {
   }
 
   function exportCsv(type: ReportType, title: string) {
-    const r = build(type, data, from, to, villa, basis)
+    const built = build(type, data, from, to, villa, basis)
+    const r = { ...built, rows: b2bOnce(type, built.rows) }
     download(`${fileBase(title)}_${from}_${to}.csv`, toCsv(r.columns, r.rows, csvHeading(type, title), csvTotal(type, r)))
   }
 
