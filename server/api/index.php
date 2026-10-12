@@ -208,13 +208,14 @@ try {
     json_out(['booking' => get_booking($ref)]);
   }
 
-  // Permanently delete a booking (and its payments)
+  // Permanently delete a booking (and its payments and B2B commission entries; other linked expenses stay)
   if ($method === 'DELETE' && count($seg) === 2 && $seg[0] === 'bookings') {
     require_right($me, 'cancel_bookings');
     $ref = $seg[1];
     $pdo = db();
     $pdo->beginTransaction();
     $pdo->prepare('DELETE FROM payments WHERE booking_ref = ?')->execute([$ref]);
+    $pdo->prepare("DELETE FROM expenses WHERE booking_ref = ? AND category = 'B2B Commission'")->execute([$ref]);
     $pdo->prepare('DELETE FROM bookings WHERE ref = ?')->execute([$ref]);
     $pdo->commit();
     json_out(['ok' => true]);

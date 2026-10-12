@@ -55,7 +55,7 @@ export function BookingActions({ booking, variant, onDeleted }: { booking: Booki
           <Modal title={confirm === 'delete' ? 'Delete booking?' : 'Cancel this booking?'} onClose={() => { if (!busy) setConfirm(null) }}>
             <p className="text-sm leading-relaxed text-slate-600">
               {confirm === 'delete' ? (
-                <>Permanently delete <span className="font-semibold text-slate-900">{booking.ref}</span> — {booking.guest}? This also removes its payment history and <span className="font-semibold">cannot be undone.</span></>
+                <>Permanently delete <span className="font-semibold text-slate-900">{booking.ref}</span> — {booking.guest}? This also removes its payment history and B2B commission entries, and <span className="font-semibold">cannot be undone.</span></>
               ) : (
                 <>Mark <span className="font-semibold text-slate-900">{booking.ref}</span> — {booking.guest} as <span className="font-semibold">cancelled</span>? You can still find it in the bookings list.</>
               )}

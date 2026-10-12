@@ -60,7 +60,9 @@ export function initials(name: string): string {
 }
 
 /** The app's "today" — matches the seed-data window. */
-export const TODAY = new Date(2026, 8, 17) // 2026-09-17
+const now = new Date()
+/** Today (midnight, local time), taken when the page loads. */
+export const TODAY = new Date(now.getFullYear(), now.getMonth(), now.getDate())
 export const TODAY_ISO = toISO(TODAY)
 
 /** 17 Sep 2026 */

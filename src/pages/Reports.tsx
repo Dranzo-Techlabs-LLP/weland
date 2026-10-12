@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { CheckCircle2, Download, Eye, FileText, X } from 'lucide-react'
-import { B2B_CATEGORY, paidOf, useStore } from '../data/store'
+import { B2B_CATEGORY, b2bRowsOf, paidOf, useStore } from '../data/store'
 import { bookingHasRoom, ROOM_OPTIONS } from '../lib/config'
 import { formatINR, TODAY, TODAY_ISO, toISO } from '../lib/format'
 import { BOOKING_STATUSES, EXPENSE_CATEGORIES, PAYMENT_METHODS } from '../lib/permissions'
@@ -29,14 +29,16 @@ function build(type: ReportType, data: AppData, from: string, to: string, villa:
     const rows: (string | number)[][] = []
     for (const b of data.bookings) {
       if (!villaOk(b.villa)) continue
+      // the booking's total B2B commission, shown on each of its rows
+      const b2b = b2bRowsOf(data.expenses, b.ref).reduce((s, e) => s + e.amount, 0)
       for (const p of b.payments) {
         const ok = basis === 'cash' ? inRange(p.date) : inRange(b.checkIn)
         if (!ok) continue
-        rows.push([p.date, b.ref, b.guest, b.villa, p.kind, p.method || '—', p.amount])
+        rows.push([p.date, b.ref, b.guest, b.villa, p.kind, p.method || '—', p.amount, b2b || '—'])
       }
     }
     rows.sort((a, b) => (String(a[0]) < String(b[0]) ? 1 : -1))
-    return { columns: ['Date', 'Reference', 'Guest', 'Room', 'Kind', 'Method', 'Amount'], rows, money: [6] }
+    return { columns: ['Date', 'Reference', 'Guest', 'Room', 'Kind', 'Method', 'Amount', 'B2B commission'], rows, money: [6, 7] }
   }
   if (type === 'expenses') {
     const rows = data.expenses
@@ -129,7 +131,7 @@ function ReportCard({ title, desc, onPreview, onExport, exportLabel }: { title: 
 
 const COMBINED_TYPES = ['Payment', 'Advance', 'Refund', 'Expense']
 
-function SummaryCard({ label, value, sub, tone }: { label: string; value: string; sub: string; tone: 'green' | 'red' | 'slate' }) {
+function SummaryCard({ label, value, sub, tone }: { label: string; value: string; sub: React.ReactNode; tone: 'green' | 'red' | 'slate' }) {
   const color = tone === 'green' ? 'text-emerald-700' : tone === 'red' ? 'text-red-600' : 'text-slate-900'
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -172,6 +174,15 @@ export function Reports() {
   }, [report, filters])
 
   const summary = report && active ? summarize(active.type, filtered) : { credited: 0, debited: 0 }
+  // Payments & Refunds: the B2B commission of the bookings listed, taken off Total Credited (0 on the other reports)
+  // Payments & Refunds: payments received in cash vs. by bank / digital (UPI, card, bank transfer). A payment with no method counts as cash (the form's default).
+  const paymentRows = active?.type === 'payments' ? filtered.filter((r) => r[4] === 'payment' && typeof r[6] === 'number') : []
+  const cashTotal = paymentRows.filter((r) => r[5] === 'Cash' || r[5] === '—').reduce((sum, r) => sum + (r[6] as number), 0)
+  const bankTotal = paymentRows.reduce((sum, r) => sum + (r[6] as number), 0) - cashTotal
+  const b2bTotal = active?.type === 'payments'
+    ? [...new Set(filtered.map((r) => String(r[1]).toLowerCase()))]
+        .reduce((sum, ref) => sum + b2bRowsOf(data.expenses, ref).reduce((a, e) => a + e.amount, 0), 0)
+    : 0
 
   function openPreview(type: ReportType, title: string) {
     setActive({ type, title })
@@ -221,9 +232,23 @@ export function Reports() {
           )}
 
           <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <SummaryCard label="Total Credited" value={formatINR(summary.credited)} sub="money in" tone="green" />
-            <SummaryCard label="Total Debited" value={formatINR(summary.debited)} sub="refunds + expenses out" tone="red" />
-            <SummaryCard label="Overall Total" value={formatINR(summary.credited - summary.debited)} sub="credited − debited" tone="slate" />
+            <SummaryCard
+              label="Total Credited"
+              value={formatINR(summary.credited - b2bTotal)}
+              sub="money in"
+              tone="green"
+            />
+            {active.type === 'payments' ? (
+              <>
+                <SummaryCard label="Collected in Cash" value={formatINR(cashTotal)} sub="payments received as cash" tone="slate" />
+                <SummaryCard label="Collected by Bank & Digital" value={formatINR(bankTotal)} sub="UPI, card, bank transfer" tone="slate" />
+              </>
+            ) : (
+              <>
+                <SummaryCard label="Total Debited" value={formatINR(summary.debited)} sub="refunds + expenses out" tone="red" />
+                <SummaryCard label="Overall Total" value={formatINR(summary.credited - summary.debited)} sub="credited − debited" tone="slate" />
+              </>
+            )}
           </div>
 
           <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">

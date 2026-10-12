@@ -212,7 +212,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const deleteBooking = useCallback((ref: string) => guard(async () => {
     await api.deleteBooking(ref)
-    setData((d) => ({ ...d, bookings: d.bookings.filter((b) => b.ref !== ref) }))
+    // the server also removes the booking's B2B commission entries
+    setData((d) => ({
+      ...d,
+      bookings: d.bookings.filter((b) => b.ref !== ref),
+      expenses: d.expenses.filter((e) => !b2bRowsOf([e], ref).length),
+    }))
   }), [guard])
 
   const clearError = useCallback(() => setError(null), [])

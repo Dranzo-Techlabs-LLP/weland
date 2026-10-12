@@ -6,7 +6,8 @@ import { useStore } from '../data/store'
 import { bookingHasRoom, bookingRooms, FULL_PROPERTY, isFullProperty, ROOM_OPTIONS } from '../lib/config'
 import { CATEGORY_PILL, EXPENSE_CATEGORIES } from '../lib/permissions'
 import { fmtDate, formatINR, TODAY_ISO } from '../lib/format'
-import { inputCls, primaryBtnCls, secondaryBtnCls, selectCls, textareaCls, thCls, thRightCls } from '../components/styles'
+import { dangerBtnCls, inputCls, primaryBtnCls, secondaryBtnCls, selectCls, textareaCls, thCls, thRightCls } from '../components/styles'
+import { Modal } from '../components/ui/Modal'
 import { RoomPicker } from '../components/ui/RoomPicker'
 
 const BLANK = { date: TODAY_ISO, category: EXPENSE_CATEGORIES[1], rooms: [] as string[], fullProperty: false, bookingRef: '', description: '', amount: '' }
@@ -21,6 +22,17 @@ export function Expenses() {
   const [editId, setEditId] = useState<string | null>(null)
   const [form, setForm] = useState(BLANK)
   const [err, setErr] = useState('')
+  const [delId, setDelId] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState(false)
+  const delRow = delId ? data.expenses.find((x) => x.id === delId) : undefined
+
+  async function confirmDelete() {
+    if (!delId) return
+    setDeleting(true)
+    await deleteExpense(delId)
+    setDeleting(false)
+    setDelId(null)
+  }
 
   const rows = useMemo(
     () => data.expenses.filter((e) => villa === 'All rooms' || bookingHasRoom(e.villa, villa)).sort((a, b) => (a.date < b.date ? 1 : -1)),
@@ -109,7 +121,7 @@ export function Expenses() {
                     {canEdit && (
                       <span className="inline-flex items-center gap-2">
                         <button onClick={() => startEdit(r.id)} className="text-slate-400 hover:text-emerald-700" aria-label="Edit"><Pencil size={15} /></button>
-                        <button onClick={() => deleteExpense(r.id)} className="text-slate-400 hover:text-red-600" aria-label="Delete"><Trash2 size={15} /></button>
+                        <button onClick={() => setDelId(r.id)} className="text-slate-400 hover:text-red-600" aria-label="Delete"><Trash2 size={15} /></button>
                       </span>
                     )}
                   </td>
@@ -120,6 +132,20 @@ export function Expenses() {
           </table>
         </div>
       </div>
+
+      {delRow && (
+        <Modal title="Delete this expense?" onClose={() => { if (!deleting) setDelId(null) }}>
+          <p className="text-sm leading-relaxed text-slate-600">
+            Remove the <span className="font-semibold text-slate-900">{delRow.category}</span> expense of{' '}
+            <span className="nums font-semibold text-slate-900">{formatINR(delRow.amount)}</span> on {fmtDate(delRow.date)}
+            {delRow.description ? <> ({delRow.description})</> : null}? This <span className="font-semibold">cannot be undone.</span>
+          </p>
+          <div className="mt-6 flex justify-end gap-2">
+            <button onClick={() => setDelId(null)} disabled={deleting} className={secondaryBtnCls}>Keep it</button>
+            <button onClick={confirmDelete} disabled={deleting} className={`${dangerBtnCls} disabled:opacity-60`}>{deleting ? 'Deleting…' : 'Delete'}</button>
+          </div>
+        </Modal>
+      )}
     </>
   )
 }

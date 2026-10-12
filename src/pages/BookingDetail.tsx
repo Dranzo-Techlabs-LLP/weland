@@ -305,7 +305,11 @@ export function BookingDetail() {
             )}
           </div>
           <div className="mt-4 space-y-3 text-sm">
-            <div className="flex justify-between gap-4"><span className="text-slate-500">Total</span><span className="nums font-semibold text-slate-900">{formatINR(booking.total)}</span></div>
+            <div className="flex justify-between gap-4">
+              <span className="text-slate-500">Total{b2b > 0 && ' (excl. B2B)'}</span>
+              <span className="nums font-semibold text-slate-900">{formatINR(booking.total - b2b)}</span>
+            </div>
+            {b2b > 0 && <div className="-mt-2 text-right text-xs text-slate-400">Booking total <span className="nums">{formatINR(booking.total)}</span> (what the guest pays)</div>}
             <div className="flex justify-between gap-4"><span className="text-slate-500">Received <span className="text-slate-400">(incl. advance)</span></span><span className="nums font-medium text-emerald-700">{formatINR(paid)}</span></div>
             <div className="flex justify-between gap-4">
               <span className="text-slate-500">B2B commission{b2bExpenses.length > 1 && <span className="text-slate-400"> ({b2bExpenses.length} entries)</span>}</span>
