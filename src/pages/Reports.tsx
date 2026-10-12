@@ -3,6 +3,7 @@ import { CheckCircle2, Download, Eye, FileText, X } from 'lucide-react'
 import { B2B_CATEGORY, b2bRowsOf, paidOf, useStore } from '../data/store'
 import { bookingHasRoom, ROOM_OPTIONS } from '../lib/config'
 import { formatINR, TODAY, TODAY_ISO, toISO } from '../lib/format'
+import { buildXlsx } from '../lib/xlsx'
 import { BOOKING_STATUSES, EXPENSE_CATEGORIES, PAYMENT_METHODS } from '../lib/permissions'
 import { inputCls, primaryBtnCls, secondaryBtnCls, selectCls } from '../components/styles'
 import type { AppData, Booking } from '../types'
@@ -102,13 +103,42 @@ function matchText(cell: string, filter: string): boolean {
   return c.includes(f)
 }
 
-function toCsv(columns: string[], rows: (string | number)[][]): string {
+const RESORT_HEADING = 'WeLand Resorts'
+
+/** CSV with the resort name and the report name on top, the table, and a Total row at the end. */
+function toCsv(columns: string[], rows: (string | number)[][], heading: string, total: (string | number)[]): string {
   const esc = (c: string | number) => (typeof c === 'string' && (c.includes(',') || c.includes('"')) ? `"${c.replace(/"/g, '""')}"` : String(c))
-  return [columns.join(','), ...rows.map((r) => r.map(esc).join(','))].join('\n')
+  return [RESORT_HEADING, heading, '', columns.join(','), ...rows.map((r) => r.map(esc).join(',')), total.map(esc).join(',')].join('\n')
 }
 
-function download(name: string, csv: string) {
-  const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }))
+/** The Total row of a CSV: money columns added up (Payments & Refunds: payments less refunds, and each booking's B2B once). */
+function csvTotal(type: ReportType, report: Report): (string | number)[] {
+  const total: (string | number)[] = report.columns.map(() => '')
+  if (type === 'payments') {
+    total[0] = 'Total Amount (payments less refunds)'
+    total[6] = report.rows.reduce((s, r) => s + (typeof r[6] === 'number' ? (r[4] === 'refund' ? -r[6] : r[6]) : 0), 0)
+    // the B2B commission is repeated on each of a booking's rows: count it once per booking
+    const seen = new Set<string>()
+    total[7] = report.rows.reduce((s, r) => {
+      const ref = String(r[1])
+      if (seen.has(ref) || typeof r[7] !== 'number') return s
+      seen.add(ref)
+      return s + r[7]
+    }, 0)
+    return total
+  }
+  total[0] = 'Total Amount'
+  for (const i of report.money) total[i] = report.rows.reduce((s, r) => s + (typeof r[i] === 'number' ? r[i] : 0), 0)
+  return total
+}
+
+/** File-name part of a report title: letters and digits only, e.g. "payments-refunds". */
+const fileBase = (title: string) => title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+
+const csvHeading = (type: ReportType, title: string) => (type === 'payments' ? 'Payments & Refunds' : title)
+
+function downloadXlsx(name: string, bytes: Uint8Array) {
+  const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }))
   const a = document.createElement('a')
   a.href = url
   a.download = name
@@ -116,14 +146,25 @@ function download(name: string, csv: string) {
   URL.revokeObjectURL(url)
 }
 
-function ReportCard({ title, desc, onPreview, onExport, exportLabel }: { title: string; desc: string; onPreview: () => void; onExport: () => void; exportLabel: string }) {
+function download(name: string, csv: string) {
+  // the byte-order mark makes Excel read the file as UTF-8 (so "—" doesn't show as "â€”")
+  const url = URL.createObjectURL(new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' }))
+  const a = document.createElement('a')
+  a.href = url
+  a.download = name
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+function ReportCard({ title, desc, onPreview, onExport, onExcel, exportLabel }: { title: string; desc: string; onPreview: () => void; onExport: () => void; onExcel?: () => void; exportLabel: string }) {
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
       <h3 className="flex items-center gap-2 text-[15px] font-semibold text-slate-900"><FileText size={16} className="text-emerald-600" />{title}</h3>
       <p className="mt-2 min-h-[40px] text-[13px] text-slate-500">{desc}</p>
-      <div className="mt-3 flex gap-2">
+      <div className="mt-3 flex flex-wrap gap-2">
         <button onClick={onPreview} className={secondaryBtnCls}><Eye size={15} /> Preview</button>
         <button onClick={onExport} className={primaryBtnCls}>{exportLabel === 'PDF' ? <FileText size={15} /> : <Download size={15} />} {exportLabel}</button>
+        {onExcel && <button onClick={onExcel} className={primaryBtnCls}><Download size={15} /> Excel</button>}
       </div>
     </div>
   )
@@ -190,9 +231,19 @@ export function Reports() {
     setBannerOpen(true)
   }
 
+  /** The styled Excel file: "WeLand Resorts", the report name, the table and a Total row. */
+  function exportExcel(type: ReportType, title: string, rep?: Report) {
+    const r = rep ?? build(type, data, from, to, villa, basis)
+    const heading = csvHeading(type, title)
+    downloadXlsx(
+      `${fileBase(title)}_${from}_${to}.xlsx`,
+      buildXlsx({ sheetName: heading, heading: RESORT_HEADING, subheading: heading, columns: r.columns, rows: r.rows, money: r.money, total: csvTotal(type, r) }),
+    )
+  }
+
   function exportCsv(type: ReportType, title: string) {
     const r = build(type, data, from, to, villa, basis)
-    download(`${title.toLowerCase().replace(/\s+/g, '-')}_${from}_${to}.csv`, toCsv(r.columns, r.rows))
+    download(`${fileBase(title)}_${from}_${to}.csv`, toCsv(r.columns, r.rows, csvHeading(type, title), csvTotal(type, r)))
   }
 
   return (
@@ -215,9 +266,9 @@ export function Reports() {
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <ReportCard title="Bookings" desc="All bookings with guest, stay, totals and amount paid." exportLabel="CSV" onPreview={() => openPreview('bookings', 'Bookings')} onExport={() => exportCsv('bookings', 'Bookings')} />
-        <ReportCard title="Payments & Refunds" desc="Every payment and refund line in the period." exportLabel="CSV" onPreview={() => openPreview('payments', 'Payments & Refunds')} onExport={() => exportCsv('payments', 'Payments')} />
-        <ReportCard title="Expenses" desc="Operating expenses by room and category." exportLabel="CSV" onPreview={() => openPreview('expenses', 'Expenses')} onExport={() => exportCsv('expenses', 'Expenses')} />
+        <ReportCard title="Bookings" desc="All bookings with guest, stay, totals and amount paid." exportLabel="CSV" onPreview={() => openPreview('bookings', 'Bookings')} onExport={() => exportCsv('bookings', 'Bookings')} onExcel={() => exportExcel('bookings', 'Bookings')} />
+        <ReportCard title="Payments & Refunds" desc="Every payment and refund line in the period." exportLabel="CSV" onPreview={() => openPreview('payments', 'Payments & Refunds')} onExport={() => exportCsv('payments', 'Payments')} onExcel={() => exportExcel('payments', 'Payments')} />
+        <ReportCard title="Expenses" desc="Operating expenses by room and category." exportLabel="CSV" onPreview={() => openPreview('expenses', 'Expenses')} onExport={() => exportCsv('expenses', 'Expenses')} onExcel={() => exportExcel('expenses', 'Expenses')} />
         <ReportCard title="Combined Report" desc="Cash book: payments in, refunds + expenses out, with running balance." exportLabel="PDF" onPreview={() => openPreview('combined', 'Combined Report')} onExport={() => window.print()} />
       </div>
 
@@ -256,7 +307,8 @@ export function Reports() {
               <h2 className="text-[15px] font-semibold text-slate-900">{active.title} · {filtered.length} Rows</h2>
               <div className="flex items-center gap-3">
                 <span className="hidden text-xs text-slate-400 sm:inline">Tip: type <code className="rounded bg-slate-100 px-1 text-slate-500">!term</code> to exclude</span>
-                <button onClick={() => download(`${active.title.toLowerCase().replace(/\s+/g, '-')}_${from}_${to}.csv`, toCsv(report.columns, filtered))} className={primaryBtnCls}><Download size={15} /> Download CSV</button>
+                <button onClick={() => download(`${fileBase(active.title)}_${from}_${to}.csv`, toCsv(report.columns, filtered, csvHeading(active.type, active.title), csvTotal(active.type, { ...report, rows: filtered })))} className={primaryBtnCls}><Download size={15} /> Download CSV</button>
+                <button onClick={() => exportExcel(active.type, active.title, { ...report, rows: filtered })} className={primaryBtnCls}><Download size={15} /> Download Excel</button>
               </div>
             </div>
             <div className="max-h-[520px] overflow-auto border-t border-slate-200 print:max-h-none print:overflow-visible">
