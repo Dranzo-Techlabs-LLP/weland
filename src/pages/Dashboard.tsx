@@ -1,6 +1,6 @@
 import { LogIn, LogOut } from 'lucide-react'
 import { useAuth } from '../auth/AuthContext'
-import { B2B_CATEGORY, useStore } from '../data/store'
+import { B2B_CATEGORY, isPaidOutB2b, useStore } from '../data/store'
 import { fmtDate, formatINR, TODAY, TODAY_ISO, toISO } from '../lib/format'
 import { StatusPill } from '../components/ui/StatusPill'
 import { VillaDot } from '../components/ui/VillaDot'
@@ -46,7 +46,8 @@ export function Dashboard() {
 
   const collected = data.bookings.reduce((s, b) => s + b.payments.filter((p) => p.date.startsWith(MONTH)).reduce((ps, p) => ps + (p.kind === 'refund' ? -p.amount : p.amount), 0), 0)
   const monthExpenses = data.expenses.filter((e) => e.date.startsWith(MONTH))
-  const b2b = monthExpenses.filter((e) => e.category === B2B_CATEGORY).reduce((s, e) => s + e.amount, 0)
+  // only the B2B commission the resort pays out comes off the revenue; money the partner collected was never received
+  const b2b = monthExpenses.filter(isPaidOutB2b).reduce((s, e) => s + e.amount, 0)
   const operating = monthExpenses.filter((e) => e.category !== B2B_CATEGORY).reduce((s, e) => s + e.amount, 0)
   const revenueMTD = collected - b2b
   const profitMTD = revenueMTD - operating

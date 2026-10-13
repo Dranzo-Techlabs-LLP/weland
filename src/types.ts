@@ -39,6 +39,7 @@ export interface Booking {
   source: string // Direct, B2B, OTA…
   notes?: string
   createdAt: string
+  b2bExternal?: number // B2B commission the partner collected externally (derived in the store; counts as settled)
 }
 
 export interface Expense {
@@ -49,6 +50,7 @@ export interface Expense {
   bookingRef?: string
   description: string
   amount: number
+  external?: boolean // B2B commission collected externally by the partner (not paid out by the resort)
 }
 
 export interface User {

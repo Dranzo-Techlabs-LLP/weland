@@ -30,20 +30,23 @@ function build(type: ReportType, data: AppData, from: string, to: string, villa:
     const rows: (string | number)[][] = []
     for (const b of data.bookings) {
       if (!villaOk(b.villa)) continue
-      // the booking's total B2B commission, shown on each of its rows
-      const b2b = b2bRowsOf(data.expenses, b.ref).reduce((s, e) => s + e.amount, 0)
+      // the booking's B2B commission, for reference only: paid out (unticked) and collected externally (ticked)
+      const b2bEntries = b2bRowsOf(data.expenses, b.ref)
+      const b2b = b2bEntries.filter((e) => !e.external).reduce((s, e) => s + e.amount, 0)
+      const b2bExt = b2bEntries.filter((e) => e.external).reduce((s, e) => s + e.amount, 0)
       for (const p of b.payments) {
         const ok = basis === 'cash' ? inRange(p.date) : inRange(b.checkIn)
         if (!ok) continue
-        rows.push([p.date, b.ref, b.guest, b.villa, p.kind, p.method || '—', p.amount, b2b || '—'])
+        rows.push([p.date, b.ref, b.guest, b.villa, p.kind, p.method || '—', p.amount, b2b || '—', b2bExt || '—'])
       }
     }
     rows.sort((a, b) => (String(a[0]) < String(b[0]) ? 1 : -1))
-    return { columns: ['Date', 'Reference', 'Guest', 'Room', 'Kind', 'Method', 'Amount', 'B2B commission'], rows, money: [6, 7] }
+    return { columns: ['Date', 'Reference', 'Guest', 'Room', 'Kind', 'Method', 'Amount', 'B2B commission', 'B2B collected externally'], rows, money: [6, 7, 8] }
   }
   if (type === 'expenses') {
     const rows = data.expenses
-      .filter((e) => villaOk(e.villa) && e.category !== B2B_CATEGORY && inRange(e.date))
+      // B2B commission the resort pays out (unticked) is an expense here; one collected externally (ticked) is not
+      .filter((e) => villaOk(e.villa) && !(e.category === B2B_CATEGORY && e.external) && inRange(e.date))
       .sort((a, b) => (a.date < b.date ? 1 : -1))
       .map((e) => [e.date, e.category, e.villa, e.bookingRef ?? '—', e.description, e.amount])
     return { columns: ['Date', 'Category', 'Room', 'Booking', 'Description', 'Amount'], rows, money: [5] }
@@ -62,7 +65,12 @@ function build(type: ReportType, data: AppData, from: string, to: string, villa:
   }
   for (const e of data.expenses) {
     if (!villaOk(e.villa) || !inRange(e.date)) continue
-    entries.push({ date: e.date, type: 'Expense', category: e.category, room: e.villa, booking: e.bookingRef || '—', description: e.description || '—', method: '—', inAmt: 0, outAmt: e.amount })
+    const external = e.category === B2B_CATEGORY && e.external // collected by the partner: not money out for the resort
+    entries.push({
+      date: e.date, type: 'Expense', category: e.category, room: e.villa, booking: e.bookingRef || '—',
+      description: external ? `${e.description || 'B2B commission'} (collected externally ${formatINR(e.amount)})` : e.description || '—',
+      method: '—', inAmt: 0, outAmt: external ? 0 : e.amount,
+    })
   }
   entries.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0))
   let bal = 0
@@ -119,11 +127,18 @@ function csvTotal(type: ReportType, report: Report): (string | number)[] {
     total[6] = report.rows.reduce((s, r) => s + (typeof r[6] === 'number' ? (r[4] === 'refund' ? -r[6] : r[6]) : 0), 0)
     // the B2B commission is repeated on each of a booking's rows: count it once per booking
     const seen = new Set<string>()
+    const seenExt = new Set<string>()
     total[7] = report.rows.reduce((s, r) => {
       const ref = String(r[1])
       if (seen.has(ref) || typeof r[7] !== 'number') return s
       seen.add(ref)
       return s + r[7]
+    }, 0)
+    total[8] = report.rows.reduce((s, r) => {
+      const ref = String(r[1])
+      if (seenExt.has(ref) || typeof r[8] !== 'number') return s
+      seenExt.add(ref)
+      return s + r[8]
     }, 0)
     return total
   }
@@ -142,7 +157,7 @@ function b2bOnce(type: ReportType, rows: (string | number)[][]): (string | numbe
   return rows.map((r) => {
     const ref = String(r[1]).toLowerCase()
     if (!seen.has(ref)) { seen.add(ref); return r }
-    return [...r.slice(0, 7), '']
+    return [...r.slice(0, 7), '', '']
   })
 }
 
@@ -227,15 +242,10 @@ export function Reports() {
   }, [report, filters, active?.type])
 
   const summary = report && active ? summarize(active.type, filtered) : { credited: 0, debited: 0 }
-  // Payments & Refunds: the B2B commission of the bookings listed, taken off Total Credited (0 on the other reports)
   // Payments & Refunds: payments received in cash vs. by bank / digital (UPI, card, bank transfer). A payment with no method counts as cash (the form's default).
   const paymentRows = active?.type === 'payments' ? filtered.filter((r) => r[4] === 'payment' && typeof r[6] === 'number') : []
   const cashTotal = paymentRows.filter((r) => r[5] === 'Cash' || r[5] === '—').reduce((sum, r) => sum + (r[6] as number), 0)
   const bankTotal = paymentRows.reduce((sum, r) => sum + (r[6] as number), 0) - cashTotal
-  const b2bTotal = active?.type === 'payments'
-    ? [...new Set(filtered.map((r) => String(r[1]).toLowerCase()))]
-        .reduce((sum, ref) => sum + b2bRowsOf(data.expenses, ref).reduce((a, e) => a + e.amount, 0), 0)
-    : 0
 
   function openPreview(type: ReportType, title: string) {
     setActive({ type, title })
@@ -282,7 +292,7 @@ export function Reports() {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <ReportCard title="Bookings" desc="All bookings with guest, stay, totals and amount paid." exportLabel="CSV" onPreview={() => openPreview('bookings', 'Bookings')} onExport={() => exportCsv('bookings', 'Bookings')} onExcel={() => exportExcel('bookings', 'Bookings')} />
         <ReportCard title="Payments & Refunds" desc="Every payment and refund line in the period." exportLabel="CSV" onPreview={() => openPreview('payments', 'Payments & Refunds')} onExport={() => exportCsv('payments', 'Payments')} onExcel={() => exportExcel('payments', 'Payments')} />
-        <ReportCard title="Expenses" desc="Operating expenses by room and category." exportLabel="CSV" onPreview={() => openPreview('expenses', 'Expenses')} onExport={() => exportCsv('expenses', 'Expenses')} onExcel={() => exportExcel('expenses', 'Expenses')} />
+        <ReportCard title="Expenses" desc="Expenses by room and category, including B2B commission you pay out." exportLabel="CSV" onPreview={() => openPreview('expenses', 'Expenses')} onExport={() => exportCsv('expenses', 'Expenses')} onExcel={() => exportExcel('expenses', 'Expenses')} />
         <ReportCard title="Combined Report" desc="Cash book: payments in, refunds + expenses out, with running balance." exportLabel="PDF" onPreview={() => openPreview('combined', 'Combined Report')} onExport={() => window.print()} />
       </div>
 
@@ -299,7 +309,7 @@ export function Reports() {
           <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
             <SummaryCard
               label="Total Credited"
-              value={formatINR(summary.credited - b2bTotal)}
+              value={formatINR(summary.credited)}
               sub="money in"
               tone="green"
             />

@@ -1,7 +1,7 @@
 import { useEffect, type ReactNode } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { ArrowLeft, Globe, Instagram, Mail, MessageCircle, Phone, Printer } from 'lucide-react'
-import { b2bRowsOf, balanceOf, paidOf, useStore } from '../data/store'
+import { balanceOf, paidOf, useStore } from '../data/store'
 import { RESORT } from '../lib/config'
 import { fmtDate, formatINR, parseISO, toISO } from '../lib/format'
 import { primaryBtnCls } from '../components/styles'
@@ -55,7 +55,9 @@ export function BookingInvoice() {
     )
   }
 
-  const paid = paidOf(booking)
+  // The invoice never mentions B2B: the full total, and everything paid (including what a booking partner collected)
+  const partnerPaid = booking.b2bExternal ?? 0
+  const paid = paidOf(booking) + partnerPaid
   const balance = balanceOf(booking)
   const nightCount = nights(booking.checkIn, booking.checkOut)
   const issued = fmtDate(toISO(new Date()))
@@ -64,10 +66,6 @@ export function BookingInvoice() {
   const payments = data.invoice.showPayments
     ? [...booking.payments].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0))
     : []
-  const b2bEntries = data.invoice.showB2b
-    ? b2bRowsOf(data.expenses, booking.ref).sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0))
-    : []
-  const b2bTotal = b2bEntries.reduce((s, e) => s + e.amount, 0)
 
   return (
     <div className="mx-auto max-w-2xl">
@@ -125,7 +123,7 @@ export function BookingInvoice() {
           </tbody>
         </table>
 
-        {payments.length > 0 && (
+        {(payments.length > 0 || (data.invoice.showPayments && partnerPaid > 0)) && (
           <div className="mt-6 print:break-inside-avoid">
             <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Payments</div>
             <table className="mt-2 w-full border-collapse text-sm">
@@ -148,6 +146,15 @@ export function BookingInvoice() {
                     <td className="nums py-2 text-right text-slate-900">{p.kind === 'refund' ? '−' : ''}{formatINR(p.amount)}</td>
                   </tr>
                 ))}
+                {partnerPaid > 0 && (
+                  <tr className="border-b border-slate-100">
+                    <td className="nums py-2 text-slate-700">—</td>
+                    <td className="py-2 text-slate-700">payment</td>
+                    <td className="py-2 text-slate-700">Booking partner</td>
+                    <td className="py-2 text-slate-700">—</td>
+                    <td className="nums py-2 text-right text-slate-900">{formatINR(partnerPaid)}</td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -160,27 +167,6 @@ export function BookingInvoice() {
             <Row label="Balance due" value={formatINR(balance)} strong />
           </div>
         </div>
-
-        {b2bEntries.length > 0 && (
-          <div className="mt-6 print:break-inside-avoid">
-            <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">B2B commission</div>
-            <table className="mt-2 w-full border-collapse text-sm">
-              <tbody>
-                {b2bEntries.map((e) => (
-                  <tr key={e.id} className="border-b border-slate-100">
-                    <td className="nums w-28 py-2 text-slate-700">{fmtDate(e.date)}</td>
-                    <td className="py-2 text-slate-700">{e.description}</td>
-                    <td className="nums py-2 text-right text-slate-900">−{formatINR(e.amount)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            <div className="ml-auto mt-2 w-full max-w-xs">
-              {b2bEntries.length > 1 && <Row label="Total B2B commission" value={`−${formatINR(b2bTotal)}`} />}
-              <Row label="Net after B2B commission" value={formatINR(paid - b2bTotal)} strong />
-            </div>
-          </div>
-        )}
 
         {terms && (
           <div className="mt-8 border-t border-slate-200 pt-4">

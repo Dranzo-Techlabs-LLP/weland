@@ -42,23 +42,29 @@ export function Accounting() {
       const bk = data.bookings.filter((b) => primaryRoom(b.villa) === v)
       const collected = bk.reduce((s, b) => s + b.payments.filter((p) => p.kind === 'payment' && payOk(b, p.date)).reduce((ps, p) => ps + p.amount, 0), 0)
       const refunded = bk.reduce((s, b) => s + b.payments.filter((p) => p.kind === 'refund' && payOk(b, p.date)).reduce((ps, p) => ps + p.amount, 0), 0)
-      const b2b = data.expenses.filter((e) => primaryRoom(e.villa) === v && e.category === B2B_CATEGORY && b2bOk(e)).reduce((s, e) => s + e.amount, 0)
+      const b2bRows = data.expenses.filter((e) => primaryRoom(e.villa) === v && e.category === B2B_CATEGORY && b2bOk(e))
+      const b2b = b2bRows.filter((e) => !e.external).reduce((s, e) => s + e.amount, 0) // paid out by the resort
+      const b2bExt = b2bRows.filter((e) => e.external).reduce((s, e) => s + e.amount, 0) // collected by the partner
       const operating = data.expenses.filter((e) => primaryRoom(e.villa) === v && e.category !== B2B_CATEGORY && inRange(e.date)).reduce((s, e) => s + e.amount, 0)
       const bookings = bk.filter((b) => b.status !== 'cancelled' && inRange(b.checkIn)).length
       const revenue = collected - refunded - b2b
-      return { villa: v, collected, refunded, b2b, operating, bookings, revenue, profit: revenue - operating }
+      return { villa: v, collected, refunded, b2b, b2bExt, operating, bookings, revenue, profit: revenue - operating }
     })
 
     const sum = (f: (r: (typeof perVilla)[number]) => number) => perVilla.reduce((s, r) => s + f(r), 0)
     const collected = sum((r) => r.collected)
     const refunded = sum((r) => r.refunded)
     const b2b = sum((r) => r.b2b)
+    const b2bExt = sum((r) => r.b2bExt)
     const operating = sum((r) => r.operating)
+    // Total revenue always includes the B2B amount: what was collected plus what the partner collected externally.
+    // Net revenue takes all the B2B off; money the partner kept was never collected, so it isn't taken off twice.
+    const totalRevenue = collected - refunded + b2bExt
     const netRevenue = collected - refunded - b2b
     const profit = netRevenue - operating
     const contracted = data.bookings.filter((b) => inScope(primaryRoom(b.villa)) && b.status !== 'cancelled' && inRange(b.checkIn)).reduce((s, b) => s + b.total, 0)
-    const outstanding = contracted - (collected - refunded) // what guests still owe (B2B commission isn't owed by guests)
-    return { perVilla, collected, refunded, b2b, operating, netRevenue, profit, contracted, outstanding }
+    const outstanding = contracted - (collected - refunded) - b2bExt // what guests still owe (B2B collected externally is settled)
+    return { perVilla, collected, refunded, b2b, b2bExt, operating, totalRevenue, netRevenue, profit, contracted, outstanding }
   }, [data, villa, from, to, basis])
 
   return (
@@ -85,15 +91,16 @@ export function Accounting() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <Kpi label="Collected" value={formatINR(model.collected)} sub="received from guests" tone="green" />
         <Kpi label="Refunded" value={formatINR(model.refunded)} sub="paid back" tone="red" />
-        <Kpi label="B2B Commission" value={formatINR(model.b2b)} sub="paid to partners" tone="orange" />
-        <Kpi label="Net Revenue" value={formatINR(model.netRevenue)} sub="collected − refunds − B2B" tone="green" />
+        <Kpi label="B2B Commission" value={formatINR(model.b2b + model.b2bExt)} sub={model.b2bExt > 0 ? `${formatINR(model.b2b)} paid out · ${formatINR(model.b2bExt)} collected externally` : 'paid to partners'} tone="orange" />
+        <Kpi label="Total Revenue" value={formatINR(model.totalRevenue)} sub="collected − refunds + B2B collected externally (incl. B2B)" tone="green" />
+        <Kpi label="Net Revenue" value={formatINR(model.netRevenue)} sub="total revenue − B2B commission" tone="green" />
         <Kpi label="Expenses" value={formatINR(model.operating)} sub="operating (excl. B2B)" tone="orange" />
         <Kpi label="Profit" value={formatINR(model.profit)} sub="net revenue − expenses" tone="green" />
         <Kpi label="Contracted Value" value={formatINR(model.contracted)} sub="booking totals in period" tone="green" />
-        <Kpi label="Outstanding" value={formatINR(model.outstanding)} sub="contracted − collected + refunds" tone="orange" />
+        <Kpi label="Outstanding" value={formatINR(model.outstanding)} sub="contracted − collected + refunds − B2B collected externally" tone="orange" />
       </div>
 
       <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">

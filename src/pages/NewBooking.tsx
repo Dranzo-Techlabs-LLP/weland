@@ -48,6 +48,23 @@ export function B2bCommissionBlock({ total, value, onChange, autoFocus, others =
   )
 }
 
+/** "B2B collected externally": the partner collects the commission from the guest, so the resort only
+ *  receives total - B2B. Ticked: it isn't paid out (no expense deducted again) and counts as settled. */
+export function B2bExternalCheck({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3">
+      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="mt-0.5 h-4 w-4 rounded border-slate-300 text-emerald-700 focus:ring-emerald-700/30" />
+      <span>
+        <span className="block text-sm font-medium text-slate-900">B2B collected externally</span>
+        <span className="block text-[13px] text-slate-500">
+          Tick if the B2B partner collects this commission from the guest themselves. Then you only receive the booking total minus the B2B amount,
+          and it isn't taken off again as an expense. Not ticked: it is an expense you pay out. The invoice and total revenue always include the B2B amount.
+        </span>
+      </span>
+    </label>
+  )
+}
+
 /** Advance block, plus a note on the B2B commission. Shared by New and Edit booking.
  *  B2B commission is entered on the booking page (Expense), where a booking can have several. */
 export function MoneyBlock({

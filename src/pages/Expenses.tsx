@@ -2,7 +2,8 @@ import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Pencil, Plus, Trash2 } from 'lucide-react'
 import { can, useAuth } from '../auth/AuthContext'
-import { useStore } from '../data/store'
+import { B2B_CATEGORY, useStore } from '../data/store'
+import { B2bExternalCheck } from './NewBooking'
 import { bookingHasRoom, bookingRooms, FULL_PROPERTY, isFullProperty, ROOM_OPTIONS } from '../lib/config'
 import { CATEGORY_PILL, EXPENSE_CATEGORIES } from '../lib/permissions'
 import { fmtDate, formatINR, TODAY_ISO } from '../lib/format'
@@ -10,7 +11,7 @@ import { dangerBtnCls, inputCls, primaryBtnCls, secondaryBtnCls, selectCls, text
 import { Modal } from '../components/ui/Modal'
 import { RoomPicker } from '../components/ui/RoomPicker'
 
-const BLANK = { date: TODAY_ISO, category: EXPENSE_CATEGORIES[1], rooms: [] as string[], fullProperty: false, bookingRef: '', description: '', amount: '' }
+const BLANK = { date: TODAY_ISO, category: EXPENSE_CATEGORIES[1], rooms: [] as string[], fullProperty: false, bookingRef: '', description: '', amount: '', external: false }
 
 export function Expenses() {
   const { user } = useAuth()
@@ -44,7 +45,7 @@ export function Expenses() {
   function startEdit(id: string) {
     const e = data.expenses.find((x) => x.id === id)!
     const full = isFullProperty(e.villa)
-    setForm({ date: e.date, category: e.category, rooms: full ? [] : bookingRooms(e.villa), fullProperty: full, bookingRef: e.bookingRef ?? '', description: e.description, amount: String(e.amount) })
+    setForm({ date: e.date, category: e.category, rooms: full ? [] : bookingRooms(e.villa), fullProperty: full, bookingRef: e.bookingRef ?? '', description: e.description, amount: String(e.amount), external: !!e.external })
     setErr('')
     setEditId(id)
     setOpen(true)
@@ -55,8 +56,11 @@ export function Expenses() {
     // Link to the booking's own ref when it matches one (in any letter case)
     const typed = form.bookingRef.trim()
     const bookingRef = data.bookings.find((b) => b.ref.toLowerCase() === typed.toLowerCase())?.ref ?? typed
+    // "collected externally" belongs to B2B commission entries; it is sent only when ticked, or to clear it
+    const wasExternal = editId ? !!data.expenses.find((x) => x.id === editId)?.external : false
+    const external = form.category === B2B_CATEGORY && form.external
     const villa = form.fullProperty ? FULL_PROPERTY : form.rooms.join(', ')
-    const fields = { date: form.date, category: form.category, villa, bookingRef, description: form.description, amount: Math.round(Number(form.amount)) }
+    const fields = { date: form.date, category: form.category, villa, bookingRef, description: form.description, amount: Math.round(Number(form.amount)), ...(external ? { external: true } : wasExternal ? { external: false } : {}) }
     if (editId) updateExpense(editId, fields)
     else addExpense(fields)
     setOpen(false)
@@ -92,6 +96,7 @@ export function Expenses() {
                 onChange={(rooms, full) => setForm({ ...form, rooms, fullProperty: full })} />
             </div>
             <label className="block"><span className="mb-1 block text-[13px] font-medium text-slate-700">Linked booking (optional)</span><input value={form.bookingRef} onChange={(e) => setForm({ ...form, bookingRef: e.target.value })} placeholder="KV-00700" className={`${inputCls} w-full`} /></label>
+            {form.category === B2B_CATEGORY && <div className="sm:col-span-2 lg:col-span-3"><B2bExternalCheck checked={form.external} onChange={(v) => setForm({ ...form, external: v })} /></div>}
             <label className="block sm:col-span-2 lg:col-span-3"><span className="mb-1 block text-[13px] font-medium text-slate-700">Description</span><textarea rows={2} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className={textareaCls} /></label>
           </div>
           {err && <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-[13px] text-red-700">{err}</p>}
@@ -115,7 +120,7 @@ export function Expenses() {
                   <td className="px-4 py-3"><span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${CATEGORY_PILL[r.category] ?? 'bg-slate-100 text-slate-600'}`}>{r.category}</span></td>
                   <td className="px-4 py-3 text-slate-700">{r.villa}</td>
                   <td className="px-4 py-3">{r.bookingRef ? <Link to={`/bookings/${r.bookingRef}`} onClick={(e) => e.stopPropagation()} className="nums text-emerald-700 hover:underline">{r.bookingRef}</Link> : <span className="text-slate-300">—</span>}</td>
-                  <td className="px-4 py-3 text-slate-700">{r.description}</td>
+                  <td className="px-4 py-3 text-slate-700">{r.description}{r.external && <span className="ml-2 rounded-full bg-violet-50 px-2 py-0.5 text-xs font-medium text-violet-700">collected externally</span>}</td>
                   <td className="nums px-4 py-3 text-right font-semibold text-amber-600">{formatINR(r.amount)}</td>
                   <td className="px-4 py-3 text-right">
                     {canEdit && (

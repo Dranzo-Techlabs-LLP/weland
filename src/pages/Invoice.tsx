@@ -17,7 +17,6 @@ export function Invoice() {
   const [padding, setPadding] = useState(String(s.padding))
   const [terms, setTerms] = useState(s.terms)
   const [showPayments, setShowPayments] = useState(!!s.showPayments)
-  const [showB2b, setShowB2b] = useState(!!s.showB2b)
   const [msg, setMsg] = useState('')
   const [err, setErr] = useState('')
   const [saving, setSaving] = useState(false)
@@ -35,7 +34,6 @@ export function Invoice() {
       await saveInvoice({
         prefix, next: nextNum, padding: pad, terms,
         ...(showPayments !== !!s.showPayments ? { showPayments } : {}),
-        ...(showB2b !== !!s.showB2b ? { showB2b } : {}),
       })
       setMsg('Invoice settings saved.')
     } catch (e) {
@@ -98,13 +96,6 @@ export function Invoice() {
             <span>
               <span className="block text-sm font-medium text-slate-900">Payment entries</span>
               <span className="block text-[13px] text-slate-500">List every payment, advance and refund (date, method, reference, amount), not only the total paid.</span>
-            </span>
-          </label>
-          <label className="flex items-start gap-3">
-            <input type="checkbox" checked={showB2b} onChange={(e) => setShowB2b(e.target.checked)} disabled={!canEdit} className="mt-0.5 h-4 w-4 rounded border-slate-300 text-emerald-700 focus:ring-emerald-700/30 disabled:opacity-60" />
-            <span>
-              <span className="block text-sm font-medium text-slate-900">B2B commission</span>
-              <span className="block text-[13px] text-slate-500">List the booking's B2B commission entries and the total, with the net amount after commission.</span>
             </span>
           </label>
         </div>

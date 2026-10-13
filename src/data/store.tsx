@@ -7,11 +7,15 @@ import type { AppData, Booking, BookingStatus, Expense, InvoiceSettings, Payment
 export function paidOf(b: Booking): number {
   return b.payments.reduce((s, p) => s + (p.kind === 'refund' ? -p.amount : p.amount), 0)
 }
+/** What the guest still owes: a B2B commission the partner collected externally counts as settled. */
 export function balanceOf(b: Booking): number {
-  return b.total - paidOf(b)
+  return b.total - paidOf(b) - (b.b2bExternal ?? 0)
 }
 /** Category that represents B2B partner commission (excluded from "operating" expenses). */
 export const B2B_CATEGORY = 'B2B Commission'
+
+/** B2B commission the resort pays out itself (not collected externally by the partner). */
+export const isPaidOutB2b = (e: Expense) => e.category === B2B_CATEGORY && !e.external
 
 /** A booking's B2B-commission rows. Refs match regardless of letter case, as in the database. */
 export function b2bRowsOf(expenses: Expense[], ref: string): Expense[] {
@@ -103,14 +107,19 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  // An older server saves the expense but doesn't know "collected externally"
+  const OLD_SERVER_EXTERNAL = "The B2B commission was saved, but not the 'collected externally' option. The server needs the latest update (api/index.php and api/lib.php)."
+
   const addExpense = useCallback((e: Omit<Expense, 'id'>) => guard(async () => {
     const { expense } = await api.addExpense(e)
     setData((d) => ({ ...d, expenses: [expense, ...d.expenses] }))
+    if (e.external && expense.external === undefined) throw new Error(OLD_SERVER_EXTERNAL)
   }), [guard])
 
   const updateExpense = useCallback((id: string, e: Omit<Expense, 'id'>) => guard(async () => {
     const { expense } = await api.updateExpense(id, e)
     setData((d) => ({ ...d, expenses: d.expenses.map((x) => (x.id === id ? expense : x)) }))
+    if (e.external !== undefined && expense.external === undefined) throw new Error(OLD_SERVER_EXTERNAL)
   }), [guard])
 
   const deleteExpense = useCallback((id: string) => guard(async () => {
@@ -222,11 +231,24 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const clearError = useCallback(() => setError(null), [])
 
+  // Every booking carries the B2B commission its partner collected externally, so balanceOf() is right everywhere
+  const view = useMemo<AppData>(() => {
+    const external = new Map<string, number>()
+    for (const e of data.expenses) {
+      if (e.category === B2B_CATEGORY && e.external && e.bookingRef) {
+        const k = e.bookingRef.trim().toLowerCase()
+        external.set(k, (external.get(k) ?? 0) + e.amount)
+      }
+    }
+    if (external.size === 0) return data
+    return { ...data, bookings: data.bookings.map((b) => ({ ...b, b2bExternal: external.get(b.ref.toLowerCase()) ?? 0 })) }
+  }, [data])
+
   const value = useMemo<StoreValue>(() => ({
-    data, loading, error, clearError, reload: load,
+    data: view, loading, error, clearError, reload: load,
     addExpense, updateExpense, deleteExpense, addUser, updateUser, setUserActive, saveRoleRights, addRole,
     saveInvoice, createBooking, updateBooking, deleteBooking, addPayment, updatePayment, deletePayment, setBookingStatus, saveVillaOverride,
-  }), [data, loading, error, clearError, load, addExpense, updateExpense, deleteExpense, addUser, updateUser, setUserActive, saveRoleRights, addRole, saveInvoice, createBooking, updateBooking, deleteBooking, addPayment, updatePayment, deletePayment, setBookingStatus, saveVillaOverride])
+  }), [view, loading, error, clearError, load, addExpense, updateExpense, deleteExpense, addUser, updateUser, setUserActive, saveRoleRights, addRole, saveInvoice, createBooking, updateBooking, deleteBooking, addPayment, updatePayment, deletePayment, setBookingStatus, saveVillaOverride])
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>
 }

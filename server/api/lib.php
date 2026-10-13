@@ -157,6 +157,7 @@ function expense_shape(array $e): array {
   return [
     'id' => $e['id'], 'date' => $e['date'], 'category' => $e['category'], 'villa' => $e['villa'],
     'bookingRef' => $e['booking_ref'] ?? null, 'description' => $e['description'], 'amount' => (int)$e['amount'],
+    'external' => (int)($e['external'] ?? 0) === 1, // B2B commission collected externally (false before the migration)
   ];
 }
 

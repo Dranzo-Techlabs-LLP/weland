@@ -3,7 +3,7 @@
 --  (several rooms / Full Property, adults + kids, notes, alternate
 --   mobile, payment method + reference, advance payment), the user's
 --  room, room capacity (Party Hall), and the invoice's "show on invoice"
---  options (payment entries, B2B commission)
+--  options (payment entries, B2B commission), and "B2B collected externally"
 --
 --  phpMyAdmin → click the "weland" database → SQL tab → paste all of
 --  this → Go.
@@ -93,4 +93,10 @@ PREPARE step FROM @sql; EXECUTE step; DEALLOCATE PREPARE step;
 SET @add = (SELECT COUNT(*) = 0 FROM information_schema.COLUMNS
              WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'invoice_settings' AND COLUMN_NAME = 'show_b2b');
 SET @sql = IF(@add, 'ALTER TABLE invoice_settings ADD COLUMN show_b2b TINYINT(1) NOT NULL DEFAULT 0 AFTER show_payments', 'DO 0');
+PREPARE step FROM @sql; EXECUTE step; DEALLOCATE PREPARE step;
+
+-- Expenses: a B2B commission collected externally by the partner (off = a normal expense, as before)
+SET @add = (SELECT COUNT(*) = 0 FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'expenses' AND COLUMN_NAME = 'external');
+SET @sql = IF(@add, 'ALTER TABLE expenses ADD COLUMN external TINYINT(1) NOT NULL DEFAULT 0 AFTER amount', 'DO 0');
 PREPARE step FROM @sql; EXECUTE step; DEALLOCATE PREPARE step;

@@ -263,8 +263,17 @@ try {
       'description' => $b['description'] ?? '', 'amount' => (int)round((float)($b['amount'] ?? 0)),
     ];
     $row = normalize_expense_link($row);
-    db()->prepare('INSERT INTO expenses (id, date, category, villa, booking_ref, description, amount) VALUES (?,?,?,?,?,?,?)')
-        ->execute([$row['id'], $row['date'], $row['category'], $row['villa'], $row['bookingRef'], $row['description'], $row['amount']]);
+    // "Collected externally" only applies to a B2B commission; the column is only touched when it is sent,
+    // so ordinary expenses keep saving before the migration has been run.
+    if (array_key_exists('external', $b) && !is_bool($b['external'])) fail('Invalid option.');
+    $row['external'] = $row['category'] === 'B2B Commission' && !empty($b['external']);
+    if (array_key_exists('external', $b)) {
+      db()->prepare('INSERT INTO expenses (id, date, category, villa, booking_ref, description, amount, external) VALUES (?,?,?,?,?,?,?,?)')
+          ->execute([$row['id'], $row['date'], $row['category'], $row['villa'], $row['bookingRef'], $row['description'], $row['amount'], (int)$row['external']]);
+    } else {
+      db()->prepare('INSERT INTO expenses (id, date, category, villa, booking_ref, description, amount) VALUES (?,?,?,?,?,?,?)')
+          ->execute([$row['id'], $row['date'], $row['category'], $row['villa'], $row['bookingRef'], $row['description'], $row['amount']]);
+    }
     json_out(['expense' => $row], 201);
   }
 
@@ -286,8 +295,18 @@ try {
       'amount'      => array_key_exists('amount', $b) ? (int)round((float)$b['amount']) : (int)$cur['amount'],
     ];
     $row = normalize_expense_link($row);
-    db()->prepare('UPDATE expenses SET date = ?, category = ?, villa = ?, booking_ref = ?, description = ?, amount = ? WHERE id = ?')
-        ->execute([$row['date'], $row['category'], $row['villa'], $row['bookingRef'], $row['description'], $row['amount'], $row['id']]);
+    if (array_key_exists('external', $b) && !is_bool($b['external'])) fail('Invalid option.');
+    $wasExternal = (int)($cur['external'] ?? 0) === 1;
+    $row['external'] = $row['category'] === 'B2B Commission'
+      && (array_key_exists('external', $b) ? (bool)$b['external'] : $wasExternal);
+    // touch the column only when it is sent, or when it has to be cleared (the entry stops being a B2B commission)
+    if (array_key_exists('external', $b) || ($wasExternal && !$row['external'])) {
+      db()->prepare('UPDATE expenses SET date = ?, category = ?, villa = ?, booking_ref = ?, description = ?, amount = ?, external = ? WHERE id = ?')
+          ->execute([$row['date'], $row['category'], $row['villa'], $row['bookingRef'], $row['description'], $row['amount'], (int)$row['external'], $row['id']]);
+    } else {
+      db()->prepare('UPDATE expenses SET date = ?, category = ?, villa = ?, booking_ref = ?, description = ?, amount = ? WHERE id = ?')
+          ->execute([$row['date'], $row['category'], $row['villa'], $row['bookingRef'], $row['description'], $row['amount'], $row['id']]);
+    }
     json_out(['expense' => $row]);
   }
 
