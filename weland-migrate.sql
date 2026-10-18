@@ -98,5 +98,5 @@ PREPARE step FROM @sql; EXECUTE step; DEALLOCATE PREPARE step;
 -- Expenses: a B2B commission collected externally by the partner (off = a normal expense, as before)
 SET @add = (SELECT COUNT(*) = 0 FROM information_schema.COLUMNS
              WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'expenses' AND COLUMN_NAME = 'external');
-SET @sql = IF(@add, 'ALTER TABLE expenses ADD COLUMN external TINYINT(1) NOT NULL DEFAULT 0 AFTER amount', 'DO 0');
+SET @sql = IF(@add, 'ALTER TABLE expenses ADD COLUMN `external` TINYINT(1) NOT NULL DEFAULT 0 AFTER amount', 'DO 0');
 PREPARE step FROM @sql; EXECUTE step; DEALLOCATE PREPARE step;

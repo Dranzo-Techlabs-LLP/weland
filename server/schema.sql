@@ -64,7 +64,7 @@ CREATE TABLE IF NOT EXISTS expenses (
   booking_ref VARCHAR(40) NULL,
   description VARCHAR(255) NOT NULL DEFAULT '',
   amount INT NOT NULL DEFAULT 0,
-  external TINYINT(1) NOT NULL DEFAULT 0,   -- B2B commission collected externally by the partner
+  `external` TINYINT(1) NOT NULL DEFAULT 0,   -- B2B commission collected externally by the partner
   INDEX (date), INDEX (category)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 

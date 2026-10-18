@@ -268,7 +268,7 @@ try {
     if (array_key_exists('external', $b) && !is_bool($b['external'])) fail('Invalid option.');
     $row['external'] = $row['category'] === 'B2B Commission' && !empty($b['external']);
     if (array_key_exists('external', $b)) {
-      db()->prepare('INSERT INTO expenses (id, date, category, villa, booking_ref, description, amount, external) VALUES (?,?,?,?,?,?,?,?)')
+      db()->prepare('INSERT INTO expenses (id, date, category, villa, booking_ref, description, amount, `external`) VALUES (?,?,?,?,?,?,?,?)')
           ->execute([$row['id'], $row['date'], $row['category'], $row['villa'], $row['bookingRef'], $row['description'], $row['amount'], (int)$row['external']]);
     } else {
       db()->prepare('INSERT INTO expenses (id, date, category, villa, booking_ref, description, amount) VALUES (?,?,?,?,?,?,?)')
@@ -301,7 +301,7 @@ try {
       && (array_key_exists('external', $b) ? (bool)$b['external'] : $wasExternal);
     // touch the column only when it is sent, or when it has to be cleared (the entry stops being a B2B commission)
     if (array_key_exists('external', $b) || ($wasExternal && !$row['external'])) {
-      db()->prepare('UPDATE expenses SET date = ?, category = ?, villa = ?, booking_ref = ?, description = ?, amount = ?, external = ? WHERE id = ?')
+      db()->prepare('UPDATE expenses SET date = ?, category = ?, villa = ?, booking_ref = ?, description = ?, amount = ?, `external` = ? WHERE id = ?')
           ->execute([$row['date'], $row['category'], $row['villa'], $row['bookingRef'], $row['description'], $row['amount'], (int)$row['external'], $row['id']]);
     } else {
       db()->prepare('UPDATE expenses SET date = ?, category = ?, villa = ?, booking_ref = ?, description = ?, amount = ? WHERE id = ?')
