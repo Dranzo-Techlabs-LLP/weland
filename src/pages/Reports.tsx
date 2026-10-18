@@ -1,8 +1,10 @@
 import { useMemo, useState } from 'react'
-import { CheckCircle2, Download, Eye, FileText, X } from 'lucide-react'
+import { CheckCircle2, Download, Eye, FileSpreadsheet, FileText, Loader2, X } from 'lucide-react'
+import { can, useAuth } from '../auth/AuthContext'
 import { B2B_CATEGORY, b2bRowsOf, paidOf, useStore } from '../data/store'
-import { bookingHasRoom, ROOM_OPTIONS } from '../lib/config'
+import { ALL_ROOMS, bookingHasRoom, ROOM_OPTIONS } from '../lib/config'
 import { formatINR, TODAY, TODAY_ISO, toISO } from '../lib/format'
+import { buildManagementReport, managementModel, MANAGEMENT_SHEETS } from '../lib/managementReport'
 import { buildXlsx } from '../lib/xlsx'
 import { BOOKING_STATUSES, EXPENSE_CATEGORIES, PAYMENT_METHODS } from '../lib/permissions'
 import { inputCls, primaryBtnCls, secondaryBtnCls, selectCls } from '../components/styles'
@@ -172,6 +174,32 @@ function downloadXlsx(name: string, bytes: Uint8Array) {
   URL.revokeObjectURL(url)
 }
 
+const LOGO_URL = `${import.meta.env.BASE_URL}weland-logo.png`
+
+/** The app logo as PNG bytes for the Management Report, scaled down to keep the file small (none if it can't load). */
+async function logoPng(): Promise<Uint8Array | undefined> {
+  try {
+    const res = await fetch(LOGO_URL)
+    if (!res.ok) return undefined
+    const blob = await res.blob()
+    try {
+      const img = await createImageBitmap(blob)
+      const canvas = document.createElement('canvas')
+      canvas.width = canvas.height = 160
+      const g = canvas.getContext('2d')
+      if (g) {
+        g.imageSmoothingQuality = 'high'
+        g.drawImage(img, 0, 0, 160, 160)
+        const small = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'))
+        if (small) return new Uint8Array(await small.arrayBuffer())
+      }
+    } catch { /* keep the original file */ }
+    return new Uint8Array(await blob.arrayBuffer())
+  } catch {
+    return undefined
+  }
+}
+
 function download(name: string, csv: string) {
   // the byte-order mark makes Excel read the file as UTF-8 (so "—" doesn't show as "â€”")
   const url = URL.createObjectURL(new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' }))
@@ -214,6 +242,7 @@ const filterSelectCls = 'w-full min-w-[80px] rounded-md border border-slate-200 
 
 export function Reports() {
   const { data } = useStore()
+  const { user } = useAuth()
   const [from, setFrom] = useState(toISO(new Date(TODAY.getFullYear(), TODAY.getMonth(), 1)))
   const [to, setTo] = useState(TODAY_ISO)
   const [villa, setVilla] = useState('All rooms')
@@ -221,6 +250,12 @@ export function Reports() {
   const [active, setActive] = useState<{ type: ReportType; title: string } | null>(null)
   const [filters, setFilters] = useState<Record<number, string>>({})
   const [bannerOpen, setBannerOpen] = useState(false)
+  // Management Report: profit and accounting figures, so it needs the accounting right as well
+  const canManagement = can(user, 'view_accounting')
+  const [mgmtOpen, setMgmtOpen] = useState(false)
+  const [mgmtBusy, setMgmtBusy] = useState(false)
+  const [mgmtError, setMgmtError] = useState('')
+  const mgmt = useMemo(() => (mgmtOpen ? managementModel(data, { from, to, villa, today: TODAY_ISO, basis }) : null), [mgmtOpen, data, from, to, villa, basis])
 
   const report = active ? build(active.type, data, from, to, villa, basis) : null
 
@@ -264,6 +299,22 @@ export function Reports() {
     )
   }
 
+  /** The Management Report workbook (dashboard, P&L, cash flow, ledgers…) with the logo on each sheet. */
+  async function exportManagement() {
+    setMgmtBusy(true)
+    setMgmtError('')
+    try {
+      const logo = await logoPng()
+      const bytes = buildManagementReport(data, { from, to, villa, today: TODAY_ISO, basis, generatedAt: new Date(), generatedBy: user?.name, logo })
+      const room = villa === ALL_ROOMS ? '' : `${fileBase(villa)}_`
+      downloadXlsx(`management-report_${room}${from || 'start'}_${to || TODAY_ISO}_${basis === 'stay' ? 'stay-month' : 'cash-date'}.xlsx`, bytes)
+    } catch (e) {
+      setMgmtError(e instanceof Error ? e.message : 'The Management Report could not be prepared.')
+    } finally {
+      setMgmtBusy(false)
+    }
+  }
+
   function exportCsv(type: ReportType, title: string) {
     const built = build(type, data, from, to, villa, basis)
     const r = { ...built, rows: b2bOnce(type, built.rows) }
@@ -296,6 +347,52 @@ export function Reports() {
         <ReportCard title="Combined Report" desc="Cash book: payments in, refunds + expenses out, with running balance." exportLabel="PDF" onPreview={() => openPreview('combined', 'Combined Report')} onExport={() => window.print()} />
       </div>
 
+      {canManagement && (
+        <section className="mt-4 rounded-2xl border border-slate-200 bg-white shadow-sm print:hidden">
+          <div className="flex flex-wrap items-start gap-4 p-5">
+            <img src={LOGO_URL} alt="" className="h-12 w-12 shrink-0 rounded-full" />
+            <div className="min-w-[240px] flex-1">
+              <h3 className="flex items-center gap-2 text-[15px] font-semibold text-slate-900"><FileSpreadsheet size={16} className="text-emerald-600" />Management Report</h3>
+              <p className="mt-1 max-w-3xl text-[13px] text-slate-500">
+                A presentation-ready Excel workbook for owners and management, with the resort’s logo on every sheet. Uses the From / To dates, Room and Period basis above: Stay month = bookings checking in during the period with all their payments; Cash date = money by the date it was paid (cash-basis profit).
+              </p>
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {MANAGEMENT_SHEETS.map((s) => (
+                  <span key={s} className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-0.5 text-[11px] font-medium text-slate-600">{s}</span>
+                ))}
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button onClick={() => setMgmtOpen((o) => !o)} className={secondaryBtnCls}><Eye size={15} /> {mgmtOpen ? 'Hide summary' : 'Preview'}</button>
+              <button onClick={exportManagement} disabled={mgmtBusy} className={`${primaryBtnCls} disabled:opacity-60`}>
+                {mgmtBusy ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />} {mgmtBusy ? 'Preparing…' : 'Download Excel'}
+              </button>
+            </div>
+          </div>
+          {mgmtError && <p className="border-t border-slate-200 px-5 py-3 text-sm text-red-600">{mgmtError}</p>}
+          {mgmt && (
+            <div className="grid grid-cols-1 gap-4 rounded-b-2xl border-t border-slate-200 bg-slate-50/60 p-5 sm:grid-cols-2 xl:grid-cols-3">
+              <SummaryCard label="Room revenue billed" value={formatINR(mgmt.k.billed)} sub={`${mgmt.k.bookings} bookings checking in · ${mgmt.k.roomNights} room-nights · ${mgmt.periodLabel}`} tone="slate" />
+              <SummaryCard
+                label={basis === 'stay' ? 'Total credited (for these stays)' : 'Total credited (cash date)'}
+                value={formatINR(mgmt.k.credited)}
+                sub={`Cash ${formatINR(mgmt.k.cashIn)} · Bank & digital ${formatINR(mgmt.k.bankIn)} · ${mgmt.k.refunds ? `refunds ${formatINR(mgmt.k.refunds)}, net ${formatINR(mgmt.k.collected)}` : 'no refunds'}`}
+                tone="green"
+              />
+              <SummaryCard
+                label={basis === 'stay' ? 'Net profit / (loss)' : 'Net profit / (loss) · cash basis'}
+                value={formatINR(mgmt.k.netProfit)}
+                sub={basis === 'stay' ? `${(mgmt.k.margin * 100).toFixed(1)}% of income · after B2B commission and expenses` : `${(mgmt.k.margin * 100).toFixed(1)}% of money received · after B2B paid out and expenses`}
+                tone={mgmt.k.netProfit < 0 ? 'red' : 'green'}
+              />
+              <SummaryCard label="Outstanding from guests" value={formatINR(mgmt.k.receivable)} sub={`${mgmt.k.receivableCount} booking${mgmt.k.receivableCount === 1 ? '' : 's'} with a balance due`} tone="slate" />
+              <SummaryCard label="Expenses paid" value={formatINR(mgmt.k.opex + mgmt.k.b2bPaidByDate)} sub={`Operating ${formatINR(mgmt.k.opex)} · B2B paid out ${formatINR(mgmt.k.b2bPaidByDate)}`} tone="slate" />
+              <SummaryCard label="B2B commission" value={formatINR(mgmt.k.b2b)} sub={`Paid out ${formatINR(mgmt.k.b2bOut)} · kept by partners ${formatINR(mgmt.k.b2bExt)}`} tone="slate" />
+            </div>
+          )}
+        </section>
+      )}
+
       {report && active && (
         <>
           {bannerOpen && (
@@ -306,15 +403,16 @@ export function Reports() {
             </div>
           )}
 
-          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div className={`mt-4 grid grid-cols-1 gap-4 ${active.type === 'payments' ? 'sm:grid-cols-2 xl:grid-cols-4' : 'sm:grid-cols-3'}`}>
             <SummaryCard
               label="Total Credited"
               value={formatINR(summary.credited)}
-              sub="money in"
+              sub={active.type === 'payments' && summary.debited ? `money in · net of refunds ${formatINR(summary.credited - summary.debited)}` : 'money in'}
               tone="green"
             />
             {active.type === 'payments' ? (
               <>
+                <SummaryCard label="Refunded" value={formatINR(summary.debited)} sub="money returned to guests" tone={summary.debited ? 'red' : 'slate'} />
                 <SummaryCard label="Collected in Cash" value={formatINR(cashTotal)} sub="payments received as cash" tone="slate" />
                 <SummaryCard label="Collected by Bank & Digital" value={formatINR(bankTotal)} sub="UPI, card, bank transfer" tone="slate" />
               </>

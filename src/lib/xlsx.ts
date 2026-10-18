@@ -90,11 +90,11 @@ const WORKBOOK_RELS = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
 </Relationships>`
 
-// ---- helpers
-const xmlEsc = (s: string) =>
+// ---- helpers (also used by the multi-sheet writer in xlsxBook.ts)
+export const xmlEsc = (s: string) =>
   s.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 
-function colName(i: number): string {
+export function colName(i: number): string {
   let n = i + 1
   let s = ''
   while (n > 0) {
@@ -107,7 +107,7 @@ function colName(i: number): string {
 
 const ISO_DATE = /^(\d{4})-(\d{2})-(\d{2})$/
 /** Excel's day number for a yyyy-mm-dd date. */
-function dateSerial(iso: string): number | null {
+export function dateSerial(iso: string): number | null {
   const m = ISO_DATE.exec(iso)
   if (!m) return null
   return Math.round((Date.UTC(+m[1], +m[2] - 1, +m[3]) - Date.UTC(1899, 11, 30)) / 86400000)
@@ -224,7 +224,7 @@ function crc32(data: Uint8Array): number {
   return (c ^ 0xffffffff) >>> 0
 }
 
-function zip(files: { name: string; data: Uint8Array }[]): Uint8Array {
+export function zip(files: { name: string; data: Uint8Array }[]): Uint8Array {
   const enc = new TextEncoder()
   const now = new Date()
   const dosTime = (now.getHours() << 11) | (now.getMinutes() << 5) | (now.getSeconds() >> 1)
