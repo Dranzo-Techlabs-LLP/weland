@@ -11,6 +11,7 @@ import { BookingInvoice } from './pages/BookingInvoice'
 import { BookingDetail } from './pages/BookingDetail'
 import { Accounting } from './pages/Accounting'
 import { Expenses } from './pages/Expenses'
+import { Deposits } from './pages/Deposits'
 import { Reports } from './pages/Reports'
 import { Rooms } from './pages/Rooms'
 import { Users } from './pages/Users'
@@ -34,6 +35,7 @@ export default function App() {
           <Route path="bookings/:ref" element={<RequireRight right="view_bookings"><BookingDetail /></RequireRight>} />
           <Route path="accounting" element={<RequireRight right="view_accounting"><Accounting /></RequireRight>} />
           <Route path="expenses" element={<RequireRight right="view_expenses"><Expenses /></RequireRight>} />
+          <Route path="deposits" element={<RequireRight right="view_deposits"><Deposits /></RequireRight>} />
           <Route path="reports" element={<RequireRight right="view_reports"><Reports /></RequireRight>} />
           <Route path="rooms" element={<RequireRight right="view_villas"><Rooms /></RequireRight>} />
           <Route path="users" element={<RequireRight right="view_users"><Users /></RequireRight>} />

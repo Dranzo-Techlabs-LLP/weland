@@ -20,7 +20,7 @@ const dist = join(root, 'dist')
 //  - config.php holds the database password and lives only on the server
 //    (settings only: the code it needs is in lib.php, which ships);
 //  - install.php is a one-time setup script that can wipe the database.
-const API_FILES = ['index.php', 'lib.php', '.htaccess']
+const API_FILES = ['index.php', 'lib.php', '.htaccess', '.user.ini']
 
 function run(cmd, cwd = root) {
   console.log(`\n> ${cmd}${cwd === root ? '' : `   (in ${relative(root, cwd)}/)`}`)

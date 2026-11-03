@@ -7,7 +7,7 @@
 -- ==================================================================
 
 SET FOREIGN_KEY_CHECKS = 0;
-DROP TABLE IF EXISTS sessions, payments, bookings, expenses, room_overrides, invoice_settings, users, roles;
+DROP TABLE IF EXISTS sessions, payments, bookings, expenses, cash_deposits, room_overrides, invoice_settings, users, roles;
 SET FOREIGN_KEY_CHECKS = 1;
 
 CREATE TABLE users (
@@ -91,6 +91,21 @@ CREATE TABLE invoice_settings (
   show_b2b TINYINT(1) NOT NULL DEFAULT 0         -- print the B2B commission on the invoice
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+CREATE TABLE cash_deposits (
+  id VARCHAR(32) PRIMARY KEY,
+  date DATE NOT NULL,                 -- the day the money was deposited
+  amount INT NOT NULL,
+  method VARCHAR(20) NOT NULL,        -- Bank, UPI or Cash
+  note TEXT NULL,
+  file_name VARCHAR(255) NULL,        -- attachment: original name shown in the app
+  file_path VARCHAR(255) NULL,        -- attachment: stored name (outside the web folder)
+  file_type VARCHAR(100) NULL,
+  file_size INT NULL,
+  created_by VARCHAR(120) NULL,
+  created_at DATETIME NOT NULL,
+  INDEX (date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE sessions (
   token VARCHAR(64) PRIMARY KEY,
   user_id VARCHAR(32) NOT NULL,
@@ -100,11 +115,11 @@ CREATE TABLE sessions (
 
 -- ---- Roles (rights stored as a JSON array) ----
 INSERT INTO roles (id, name, `system`, rights) VALUES
-('r1','Administrator',1,'["view_payments","record_payments","view_expenses","edit_expenses","view_accounting","view_users","manage_users","edit_invoice","view_bookings","edit_bookings","cancel_bookings","view_calendar","view_dashboard","view_reports","view_villas","edit_villas"]'),
-('r2','Manager',1,'["view_dashboard","view_calendar","view_bookings","edit_bookings","cancel_bookings","view_accounting","view_expenses","edit_expenses","view_reports","view_villas","view_payments","record_payments","view_users"]'),
+('r1','Administrator',1,'["view_payments","record_payments","view_expenses","edit_expenses","view_accounting","view_users","manage_users","edit_invoice","view_bookings","edit_bookings","cancel_bookings","view_calendar","view_dashboard","view_reports","view_villas","edit_villas","view_deposits","edit_deposits"]'),
+('r2','Manager',1,'["view_dashboard","view_calendar","view_bookings","edit_bookings","cancel_bookings","view_accounting","view_expenses","edit_expenses","view_reports","view_villas","view_payments","record_payments","view_users","view_deposits","edit_deposits"]'),
 ('r3','Front Desk',1,'["view_dashboard","view_calendar","view_bookings","edit_bookings","view_payments","record_payments","view_villas"]'),
 ('r4','B2B',1,'["view_dashboard","view_calendar","view_bookings","edit_bookings"]'),
-('r5','Owner',1,'["view_dashboard","view_calendar","view_bookings","view_accounting","view_expenses","view_reports","view_villas","view_payments"]');
+('r5','Owner',1,'["view_dashboard","view_calendar","view_bookings","view_accounting","view_expenses","view_reports","view_villas","view_payments","view_deposits"]');
 
 -- ---- Invoice settings (single row, id = 1) ----
 INSERT INTO invoice_settings (id, prefix, next, padding, terms) VALUES

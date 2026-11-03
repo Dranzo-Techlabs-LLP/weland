@@ -43,7 +43,7 @@ $pdo = db();
 // ---------------- Optional wipe (guarantees a clean slate) ----------------
 if ($fresh) {
   $pdo->exec('SET FOREIGN_KEY_CHECKS = 0');
-  foreach (['sessions','payments','bookings','expenses','room_overrides','invoice_settings','users','roles'] as $t) {
+  foreach (['sessions','payments','bookings','expenses','cash_deposits','room_overrides','invoice_settings','users','roles'] as $t) {
     $pdo->exec("DROP TABLE IF EXISTS `$t`");
   }
   $pdo->exec('SET FOREIGN_KEY_CHECKS = 1');
@@ -132,6 +132,21 @@ $pdo->exec("CREATE TABLE IF NOT EXISTS invoice_settings (
   show_b2b TINYINT(1) NOT NULL DEFAULT 0         -- print the B2B commission on the invoice
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
+$pdo->exec("CREATE TABLE IF NOT EXISTS cash_deposits (
+  id VARCHAR(32) PRIMARY KEY,
+  date DATE NOT NULL,                 -- the day the money was deposited
+  amount INT NOT NULL,
+  method VARCHAR(20) NOT NULL,        -- Bank, UPI or Cash
+  note TEXT NULL,
+  file_name VARCHAR(255) NULL,        -- attachment: original name shown in the app
+  file_path VARCHAR(255) NULL,        -- attachment: stored name (outside the web folder)
+  file_type VARCHAR(100) NULL,
+  file_size INT NULL,
+  created_by VARCHAR(120) NULL,
+  created_at DATETIME NOT NULL,
+  INDEX (date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
 $pdo->exec("CREATE TABLE IF NOT EXISTS sessions (
   token VARCHAR(64) PRIMARY KEY,
   user_id VARCHAR(32) NOT NULL,
@@ -143,11 +158,11 @@ echo "Tables ready.\n";
 
 // ---------------- Seed roles ----------------
 $roleDefaults = [
-  'Administrator' => ["view_payments","record_payments","view_expenses","edit_expenses","view_accounting","view_users","manage_users","edit_invoice","view_bookings","edit_bookings","cancel_bookings","view_calendar","view_dashboard","view_reports","view_villas","edit_villas"],
-  'Manager'       => ["view_dashboard","view_calendar","view_bookings","edit_bookings","cancel_bookings","view_accounting","view_expenses","edit_expenses","view_reports","view_villas","view_payments","record_payments","view_users"],
+  'Administrator' => ["view_payments","record_payments","view_expenses","edit_expenses","view_accounting","view_users","manage_users","edit_invoice","view_bookings","edit_bookings","cancel_bookings","view_calendar","view_dashboard","view_reports","view_villas","edit_villas","view_deposits","edit_deposits"],
+  'Manager'       => ["view_dashboard","view_calendar","view_bookings","edit_bookings","cancel_bookings","view_accounting","view_expenses","edit_expenses","view_reports","view_villas","view_payments","record_payments","view_users","view_deposits","edit_deposits"],
   'Front Desk'    => ["view_dashboard","view_calendar","view_bookings","edit_bookings","view_payments","record_payments","view_villas"],
   'B2B'           => ["view_dashboard","view_calendar","view_bookings","edit_bookings"],
-  'Owner'         => ["view_dashboard","view_calendar","view_bookings","view_accounting","view_expenses","view_reports","view_villas","view_payments"],
+  'Owner'         => ["view_dashboard","view_calendar","view_bookings","view_accounting","view_expenses","view_reports","view_villas","view_payments","view_deposits"],
 ];
 $i = 1;
 foreach ($roleDefaults as $name => $rights) {

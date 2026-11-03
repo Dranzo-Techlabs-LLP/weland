@@ -6,11 +6,11 @@ import { ALL_ROOMS, bookingHasRoom, ROOM_OPTIONS } from '../lib/config'
 import { formatINR, TODAY, TODAY_ISO, toISO } from '../lib/format'
 import { buildManagementReport, managementModel, MANAGEMENT_SHEETS } from '../lib/managementReport'
 import { buildXlsx } from '../lib/xlsx'
-import { BOOKING_STATUSES, EXPENSE_CATEGORIES, PAYMENT_METHODS } from '../lib/permissions'
+import { BOOKING_STATUSES, DEPOSIT_METHODS, EXPENSE_CATEGORIES, PAYMENT_METHODS } from '../lib/permissions'
 import { inputCls, primaryBtnCls, secondaryBtnCls, selectCls } from '../components/styles'
 import type { AppData, Booking } from '../types'
 
-type ReportType = 'bookings' | 'payments' | 'expenses' | 'combined'
+type ReportType = 'bookings' | 'payments' | 'expenses' | 'deposits' | 'combined'
 interface Report { columns: string[]; rows: (string | number)[][]; money: number[] }
 
 /** Payment methods used on a booking, in order ("UPI, Cash"); "—" when none was recorded. */
@@ -53,6 +53,14 @@ function build(type: ReportType, data: AppData, from: string, to: string, villa:
       .map((e) => [e.date, e.category, e.villa, e.bookingRef ?? '—', e.description, e.amount])
     return { columns: ['Date', 'Category', 'Room', 'Booking', 'Description', 'Amount'], rows, money: [5] }
   }
+  if (type === 'deposits') {
+    // Cash deposits: always by the date deposited; they belong to the whole property, so the room filter doesn't apply
+    const rows = (data.deposits ?? [])
+      .filter((d) => inRange(d.date))
+      .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
+      .map((d) => [d.date, d.method, d.amount, d.note || '—', d.attachment ? d.attachment.name : '—', d.createdBy || '—'])
+    return { columns: ['Date', 'Deposited via', 'Amount', 'Note', 'Attachment', 'Recorded by'], rows, money: [2] }
+  }
   // combined cash book: every money line with its details
   interface Entry { date: string; type: string; category: string; room: string; booking: string; description: string; method: string; inAmt: number; outAmt: number }
   const entries: Entry[] = []
@@ -88,6 +96,7 @@ function summarize(type: ReportType, rows: (string | number)[][]) {
   const col = (i: number) => rows.reduce((s, r) => s + (typeof r[i] === 'number' ? r[i] : 0), 0)
   if (type === 'bookings') return { credited: col(9), debited: 0 }
   if (type === 'expenses') return { credited: 0, debited: col(5) }
+  if (type === 'deposits') return { credited: 0, debited: col(2) }
   if (type === 'combined') return { credited: col(7), debited: col(8) }
   const credited = rows.reduce((s, r) => s + (r[4] === 'payment' && typeof r[6] === 'number' ? r[6] : 0), 0)
   const debited = rows.reduce((s, r) => s + (r[4] === 'refund' && typeof r[6] === 'number' ? r[6] : 0), 0)
@@ -95,8 +104,9 @@ function summarize(type: ReportType, rows: (string | number)[][]) {
 }
 
 /** A column filters by dropdown (Room/Status/Method/Type/Category), free text (with !exclude), or not at all (money columns). */
-function filterKind(col: string, idx: number, money: number[]): 'room' | 'status' | 'method' | 'type' | 'category' | 'none' | 'text' {
+function filterKind(col: string, idx: number, money: number[]): 'room' | 'status' | 'method' | 'deposit' | 'type' | 'category' | 'none' | 'text' {
   if (col === 'Room') return 'room'
+  if (col === 'Deposited via') return 'deposit'
   if (col === 'Status') return 'status'
   if (col === 'Type') return 'type'
   if (col === 'Category') return 'category'
@@ -117,7 +127,7 @@ const RESORT_HEADING = 'WeLand Resorts'
 
 /** CSV with the resort name and the report name on top, the table, and a Total row at the end. */
 function toCsv(columns: string[], rows: (string | number)[][], heading: string, total: (string | number)[]): string {
-  const esc = (c: string | number) => (typeof c === 'string' && (c.includes(',') || c.includes('"')) ? `"${c.replace(/"/g, '""')}"` : String(c))
+  const esc = (c: string | number) => (typeof c === 'string' && /[",\r\n]/.test(c) ? `"${c.replace(/"/g, '""')}"` : String(c))
   return [RESORT_HEADING, heading, '', columns.join(','), ...rows.map((r) => r.map(esc).join(',')), total.map(esc).join(',')].join('\n')
 }
 
@@ -269,7 +279,7 @@ export function Reports() {
         if (kind === 'room') return !f || f === 'All' || bookingHasRoom(String(row[i]), f)
         if (kind === 'status') return !f || f === 'All' || String(row[i]) === f
         if (kind === 'method') return !f || f === 'All' || String(row[i]).split(', ').includes(f)
-        if (kind === 'type' || kind === 'category') return !f || f === 'All' || String(row[i]) === f
+        if (kind === 'type' || kind === 'category' || kind === 'deposit') return !f || f === 'All' || String(row[i]) === f
         return matchText(String(row[i]), f)
       }),
     )
@@ -281,6 +291,14 @@ export function Reports() {
   const paymentRows = active?.type === 'payments' ? filtered.filter((r) => r[4] === 'payment' && typeof r[6] === 'number') : []
   const cashTotal = paymentRows.filter((r) => r[5] === 'Cash' || r[5] === '—').reduce((sum, r) => sum + (r[6] as number), 0)
   const bankTotal = paymentRows.reduce((sum, r) => sum + (r[6] as number), 0) - cashTotal
+  // Cash Deposits: the deposits shown, and the cash collected in the same dates (all rooms, by payment date)
+  const depositInRange = (d: string) => (!from || d >= from) && (!to || d <= to)
+  const depositsShown = active?.type === 'deposits' ? filtered.reduce((s, r) => s + (typeof r[2] === 'number' ? r[2] : 0), 0) : 0
+  const depositsByMethod = DEPOSIT_METHODS.map((m) => ({ m, sum: active?.type === 'deposits' ? filtered.filter((r) => r[1] === m).reduce((s, r) => s + (typeof r[2] === 'number' ? r[2] : 0), 0) : 0 }))
+  const depositsInPeriod = (data.deposits ?? []).filter((d) => depositInRange(d.date)).reduce((s, d) => s + d.amount, 0)
+  const cashCollected = data.bookings.reduce((s, b) => s + b.payments
+    .filter((p) => (!p.method || p.method === 'Cash') && depositInRange(p.date))
+    .reduce((ps, p) => ps + (p.kind === 'refund' ? -p.amount : p.amount), 0), 0)
 
   function openPreview(type: ReportType, title: string) {
     setActive({ type, title })
@@ -305,7 +323,7 @@ export function Reports() {
     setMgmtError('')
     try {
       const logo = await logoPng()
-      const bytes = buildManagementReport(data, { from, to, villa, today: TODAY_ISO, basis, generatedAt: new Date(), generatedBy: user?.name, logo })
+      const bytes = buildManagementReport(data, { from, to, villa, today: TODAY_ISO, basis, generatedAt: new Date(), generatedBy: user?.name, logo, deposits: can(user, 'view_deposits') })
       const room = villa === ALL_ROOMS ? '' : `${fileBase(villa)}_`
       downloadXlsx(`management-report_${room}${from || 'start'}_${to || TODAY_ISO}_${basis === 'stay' ? 'stay-month' : 'cash-date'}.xlsx`, bytes)
     } catch (e) {
@@ -344,6 +362,9 @@ export function Reports() {
         <ReportCard title="Bookings" desc="All bookings with guest, stay, totals and amount paid." exportLabel="CSV" onPreview={() => openPreview('bookings', 'Bookings')} onExport={() => exportCsv('bookings', 'Bookings')} onExcel={() => exportExcel('bookings', 'Bookings')} />
         <ReportCard title="Payments & Refunds" desc="Every payment and refund line in the period." exportLabel="CSV" onPreview={() => openPreview('payments', 'Payments & Refunds')} onExport={() => exportCsv('payments', 'Payments')} onExcel={() => exportExcel('payments', 'Payments')} />
         <ReportCard title="Expenses" desc="Expenses by room and category, including B2B commission you pay out." exportLabel="CSV" onPreview={() => openPreview('expenses', 'Expenses')} onExport={() => exportCsv('expenses', 'Expenses')} onExcel={() => exportExcel('expenses', 'Expenses')} />
+        {can(user, 'view_deposits') && (
+          <ReportCard title="Cash Deposits" desc="Money deposited by Bank, UPI or Cash, with notes and attachments, against the cash collected." exportLabel="CSV" onPreview={() => openPreview('deposits', 'Cash Deposits')} onExport={() => exportCsv('deposits', 'Cash Deposits')} onExcel={() => exportExcel('deposits', 'Cash Deposits')} />
+        )}
         <ReportCard title="Combined Report" desc="Cash book: payments in, refunds + expenses out, with running balance." exportLabel="PDF" onPreview={() => openPreview('combined', 'Combined Report')} onExport={() => window.print()} />
       </div>
 
@@ -357,7 +378,7 @@ export function Reports() {
                 A presentation-ready Excel workbook for owners and management, with the resort’s logo on every sheet. Uses the From / To dates, Room and Period basis above: Stay month = bookings checking in during the period with all their payments; Cash date = money by the date it was paid (cash-basis profit).
               </p>
               <div className="mt-3 flex flex-wrap gap-1.5">
-                {MANAGEMENT_SHEETS.map((s) => (
+                {MANAGEMENT_SHEETS.filter((s) => s !== 'Cash Deposits' || can(user, 'view_deposits')).map((s) => (
                   <span key={s} className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-0.5 text-[11px] font-medium text-slate-600">{s}</span>
                 ))}
               </div>
@@ -403,6 +424,23 @@ export function Reports() {
             </div>
           )}
 
+          {active.type === 'deposits' ? (
+          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <SummaryCard
+              label="Total Deposited"
+              value={formatINR(depositsShown)}
+              sub={depositsByMethod.map(({ m, sum }) => `${m} ${formatINR(sum)}`).join(' · ')}
+              tone="green"
+            />
+            <SummaryCard label="Cash Collected" value={formatINR(cashCollected)} sub="cash payments less cash refunds, by payment date (all rooms)" tone="slate" />
+            <SummaryCard
+              label="Cash Not Yet Deposited"
+              value={formatINR(cashCollected - depositsInPeriod)}
+              sub={`cash collected − all deposits in these dates (${formatINR(depositsInPeriod)})`}
+              tone={cashCollected - depositsInPeriod < 0 ? 'red' : 'slate'}
+            />
+          </div>
+          ) : (
           <div className={`mt-4 grid grid-cols-1 gap-4 ${active.type === 'payments' ? 'sm:grid-cols-2 xl:grid-cols-4' : 'sm:grid-cols-3'}`}>
             <SummaryCard
               label="Total Credited"
@@ -423,6 +461,7 @@ export function Reports() {
               </>
             )}
           </div>
+          )}
 
           <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
             <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
@@ -466,6 +505,11 @@ export function Reports() {
                           {kind === 'category' && (
                             <select value={val || 'All'} onChange={(e) => set(e.target.value)} className={filterSelectCls}>
                               <option>All</option>{EXPENSE_CATEGORIES.map((c) => (<option key={c}>{c}</option>))}
+                            </select>
+                          )}
+                          {kind === 'deposit' && (
+                            <select value={val || 'All'} onChange={(e) => set(e.target.value)} className={filterSelectCls}>
+                              <option>All</option>{DEPOSIT_METHODS.map((m) => (<option key={m}>{m}</option>))}
                             </select>
                           )}
                           {kind === 'method' && (

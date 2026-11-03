@@ -14,11 +14,11 @@ import { fmtDate, formatINR, monthLabel, parseISO, toISO } from './format'
 import { EXPENSE_CATEGORIES, PAYMENT_METHODS } from './permissions'
 import { colName, dateSerial } from './xlsx'
 import { inrFmt, Workbook, type BorderSide, type CellStyle, type CellValue, type NumFmt, type Sheet } from './xlsxBook'
-import type { AppData, Booking, Expense, Payment } from '../types'
+import type { AppData, Booking, Deposit, Expense, Payment } from '../types'
 
 export const MANAGEMENT_SHEETS = [
   'Dashboard', 'P&L', 'Monthly', 'Cash Flow', 'Room Summary', 'Receivables',
-  'B2B Commission', 'Bookings', 'Payments', 'Expenses', 'Balance Check', 'Setup & Notes',
+  'B2B Commission', 'Bookings', 'Payments', 'Cash Deposits', 'Expenses', 'Balance Check', 'Setup & Notes',
 ]
 
 /**
@@ -34,6 +34,7 @@ export interface ManagementOptions {
   villa: string // "All rooms" or one room / Full Property
   today: string // as-of date for balances and overdue days
   basis?: PeriodBasis // default: stay
+  deposits?: boolean // include the Cash Deposits sheet (the user may view deposits); default true
 }
 
 // ---------------------------------------------------------------- figures
@@ -122,6 +123,7 @@ export interface ManagementModel {
   active: BookingFacts[] // stays that are not cancelled
   payments: PayLine[] // stay basis: every payment of the period's stays; cash basis: paid in the period
   expenses: Expense[] // dated in the period
+  deposits: Deposit[] // cash deposits dated in the period (the whole property: no room filter)
   b2b: B2bLine[] // stay basis: commission of the period's stays (entries with no booking by their own date); cash basis: entries dated in the period
   b2bStay: B2bLine[] // commission of the period's stays, whatever the basis (for the views by check-in)
   units: string[]
@@ -134,6 +136,7 @@ export interface ManagementModel {
     credited: number; bankIn: number; refunds: number // payments before refunds (the Reports page's Total Credited), and refunds
     bankNet: number; cashNet: number; collected: number
     b2bPaidByDate: number; b2bExtByDate: number
+    deposited: number; cashByDateAll: number // cash deposits in the period; cash collected less cash refunds by payment date, all rooms
     receivable: number; receivableCount: number; credit: number
     upcomingCount: number; upcomingBilled: number; upcomingHeld: number; upcomingHeldInPeriod: number; upcomingBalance: number
     futureAdvances: number; avgBookingValue: number; collectionRate: number; b2bShare: number
@@ -272,6 +275,7 @@ export function managementModel(data: AppData, o: ManagementOptions): Management
     from, to, villa: o.villa, today: o.today, basis,
     periodLabel: periodLabel(from, to),
     months: monthKeys(from, to), upcomingKey, scope, facts, stays, active, payments, expenses, b2b, b2bStay, units, unitNights,
+    deposits: (data.deposits ?? []).filter((d) => inPeriod(d.date)).sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0)),
     k: {
       billed, retained, bookings: active.length, cancelled: stays.length - active.length,
       roomNights: sum(active, (f) => f.roomNights), guests: sum(active, (f) => f.b.guests),
@@ -282,6 +286,8 @@ export function managementModel(data: AppData, o: ManagementOptions): Management
       collected, credited, bankIn: bankAdvance + bankBalance, refunds: bankRefunds + cashRefunds,
       b2bPaidByDate: sum(expenses.filter((e) => e.category === B2B_CATEGORY && !e.external), (e) => e.amount),
       b2bExtByDate: sum(expenses.filter((e) => e.category === B2B_CATEGORY && e.external), (e) => e.amount),
+      deposited: sum((data.deposits ?? []).filter((d) => inPeriod(d.date)), (d) => d.amount),
+      cashByDateAll: sum(data.bookings.flatMap((b) => b.payments).filter((p) => isCash(p) && inPeriod(p.date)), (p) => (p.kind === 'refund' ? -p.amount : p.amount)),
       receivable: sum(owing, (f) => f.balance), receivableCount: owing.length,
       credit: -sum(active.filter((f) => f.balance < 0), (f) => f.balance),
       upcomingCount: upcoming.length, upcomingBilled: sum(upcoming, (f) => f.billed), upcomingHeld: sum(upcoming, (f) => f.received),
@@ -1353,7 +1359,38 @@ function balanceCheck(ctx: Ctx, data: AppData) {
   sh.freeze = { rows: 0, cols: 0 }
 }
 
-function setupSheet(ctx: Ctx, o: { generatedAt: Date; generatedBy?: string }, data: AppData) {
+function depositsSheet(ctx: Ctx) {
+  const { wb, m } = ctx
+  const sh = wb.sheet('Cash Deposits')
+  sh.tabColor = C.goldDeep
+  const cols: Col[] = [
+    { title: 'Date', width: 13, kind: 'date' },
+    { title: 'Deposited Via', width: 14, kind: 'text' },
+    { title: 'Amount', width: 14, kind: 'money' },
+    { title: 'Note', width: 40, kind: 'text' },
+    { title: 'Attachment', width: 24, kind: 'text' },
+    { title: 'Recorded By', width: 16, kind: 'text' },
+    { title: 'Deposit Month', width: 12, kind: 'month' },
+  ]
+  widths(sh, cols)
+  frame(sh, ctx, cols.length, `Cash Deposits · ${m.periodLabel}`, 'Money deposited (to the bank or handed over) by the date it was deposited, for the whole property. Deposits move cash, they are not income, so they don’t change any other sheet.')
+  const rows = m.deposits.map((d) => [d.date, d.method, d.amount, d.note || '', d.attachment ? d.attachment.name : '—', d.createdBy || '', `${monthKey(d.date)}-01`])
+  const tb = table(sh, ctx, 7, cols, rows, { totalLabel: 'Total deposited', emptyText: 'No cash deposits in this period.' })
+  sh.freeze = { rows: 7, cols: 0 }
+  sh.printTitles = [7, 7]
+
+  const amt = rng(3, tb.first, tb.last)
+  const via = rng(2, tb.first, tb.last)
+  const byVia = (v: string) => sum(m.deposits.filter((d) => d.method === v), (d) => d.amount)
+  summaryBlock(sh, ctx, tb.totalRow + 2, 5, [
+    ...['Bank', 'UPI', 'Cash'].map((v) => ({ label: `Deposited by ${v}`, value: byVia(v), f: rows.length ? `SUMIFS(${amt},${via},"${v}")` : '0' })),
+    { key: 'dep.total', label: 'Total deposited', value: m.k.deposited, f: '{L0}+{L1}+{L2}', level: 'sub' as const },
+    { label: 'Cash collected (cash payments less cash refunds, by payment date, all rooms)', value: m.k.cashByDateAll, f: String(m.k.cashByDateAll), memo: true },
+    { label: 'Cash not yet deposited (cash collected − total deposited)', value: m.k.cashByDateAll - m.k.deposited, f: '{L4}-{L3}', level: 'sub' as const },
+  ])
+}
+
+function setupSheet(ctx: Ctx, o: { generatedAt: Date; generatedBy?: string; deposits?: boolean }, data: AppData) {
   const { wb, t, m } = ctx
   const sh = wb.sheet('Setup & Notes')
   sh.tabColor = '64748B'
@@ -1427,6 +1464,7 @@ function setupSheet(ctx: Ctx, o: { generatedAt: Date; generatedBy?: string }, da
     'Bank & digital = UPI, card and bank transfer. A payment with no method counts as cash, as in the app. Use “Net bank & digital credits” (Cash Flow) or the Payments summary to tick off the bank statement.',
     'Total credited = payments received before refunds, the same figure as Reports → Payments & Refunds (Cash date); refunds are shown on their own line, and “net” figures are after refunds.',
     'The Balance Check sheet works out each key figure two ways (across these sheets, and with the rules of Weland’s own screens) and shows the difference; ✓ means it balances.',
+    ...(o.deposits === false ? [] : ['Cash Deposits lists money deposited (to the bank or handed over) by Bank, UPI or Cash, by the date deposited, for the whole property. Deposits move cash; they are not income or expense, so no other figure changes. “Cash not yet deposited” = cash collected (cash payments less cash refunds, by payment date) − deposits in the same period.']),
     'Totals, net lines and percentages are live Excel formulas: change a figure and they update.',
   ]
   notes.forEach((text, i) => {
@@ -1462,6 +1500,7 @@ export function buildManagementReport(data: AppData, o: ManagementOptions & { ge
   b2bSheet(ctx)
   bookingsSheet(ctx)
   paymentsSheet(ctx)
+  if (o.deposits !== false) depositsSheet(ctx)
   expensesSheet(ctx)
   balanceCheck(ctx, data)
   setupSheet(ctx, o, data)

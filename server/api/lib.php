@@ -152,6 +152,116 @@ function primary_room(string $villa): string {
   return $villa;
 }
 
+// ---------------------------------------------------------------- cash deposits
+const DEPOSIT_METHODS = ['Bank', 'UPI', 'Cash'];
+const DEPOSIT_MAX_BYTES = 5 * 1024 * 1024; // 5 MB per attachment
+/** Allowed attachment types (checked from the file's first bytes, not its name) => stored extension. */
+const DEPOSIT_FILE_TYPES = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp', 'application/pdf' => 'pdf'];
+
+function has_right(array $user, string $right): bool {
+  return in_array($right, role_rights($user['role']), true);
+}
+
+/** A cash_deposits row as the app sees it (the stored file path never leaves the server). */
+function deposit_shape(array $d): array {
+  $has = ($d['file_path'] ?? '') !== '' && $d['file_path'] !== null;
+  return [
+    'id' => $d['id'], 'date' => $d['date'], 'amount' => (int)$d['amount'], 'method' => $d['method'],
+    'note' => (string)($d['note'] ?? ''),
+    'attachment' => $has ? ['name' => (string)$d['file_name'], 'type' => (string)$d['file_type'], 'size' => (int)$d['file_size']] : null,
+    'createdBy' => (string)($d['created_by'] ?? ''),
+    'createdAt' => $d['created_at'] ?? null,
+  ];
+}
+
+/** Deposits for the app; empty before the migration has created the table. */
+function deposits_list(): array {
+  try {
+    $rows = db()->query('SELECT * FROM cash_deposits ORDER BY date DESC, created_at DESC, id DESC')->fetchAll();
+  } catch (\PDOException $e) {
+    return [];
+  }
+  return array_map(fn($d) => deposit_shape($d), $rows);
+}
+
+/** Folder for deposit attachments: outside the public web folder (next to public_html), or UPLOAD_DIR from config.php. */
+function deposit_upload_dir(): string {
+  $base = defined('UPLOAD_DIR') ? rtrim((string)constant('UPLOAD_DIR'), '/\\') : dirname(__DIR__, 2) . '/weland_uploads';
+  $dir = $base . '/deposits';
+  if (!is_dir($dir) && !@mkdir($dir, 0750, true) && !is_dir($dir)) {
+    fail('The server could not create the folder for attachments.', 500);
+  }
+  return $dir;
+}
+
+/** The real type of a file from its first bytes (null when it isn't an allowed type). */
+function sniff_file_type(string $path): ?string {
+  $h = @fopen($path, 'rb');
+  if (!$h) return null;
+  $head = (string)fread($h, 16);
+  fclose($h);
+  if (strncmp($head, "%PDF", 4) === 0) return 'application/pdf';
+  if (strncmp($head, "\xFF\xD8\xFF", 3) === 0) return 'image/jpeg';
+  if (strncmp($head, "\x89PNG\r\n\x1A\n", 8) === 0) return 'image/png';
+  if (strncmp($head, 'RIFF', 4) === 0 && substr($head, 8, 4) === 'WEBP') return 'image/webp';
+  return null;
+}
+
+/** "1M", "512K", "8G" from php.ini in bytes. */
+function ini_bytes(string $v): int {
+  $v = trim($v);
+  if ($v === '') return 0;
+  $n = (int)$v;
+  switch (strtolower(substr($v, -1))) {
+    case 'g': return $n * 1024 * 1024 * 1024;
+    case 'm': return $n * 1024 * 1024;
+    case 'k': return $n * 1024;
+  }
+  return $n;
+}
+
+/** The attachment sent as "file", checked; null when no file was sent. */
+function deposit_upload(): ?array {
+  $f = $_FILES['file'] ?? null;
+  if (!$f || ($f['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) return null;
+  if (is_array($f['error'])) fail('Attach one file only.');
+  if ($f['error'] === UPLOAD_ERR_INI_SIZE || $f['error'] === UPLOAD_ERR_FORM_SIZE) {
+    fail('The file is too large for the server. Keep it under ' . ini_get('upload_max_filesize') . 'B.', 413);
+  }
+  if ($f['error'] !== UPLOAD_ERR_OK || !is_uploaded_file($f['tmp_name'])) fail('The file could not be uploaded. Please try again.');
+  if ((int)$f['size'] > DEPOSIT_MAX_BYTES) fail('The file is too large. The limit is 5 MB.', 413);
+  $type = sniff_file_type($f['tmp_name']);
+  if ($type === null) fail('Attach a photo (JPG, PNG or WebP) or a PDF.');
+  $name = preg_replace('/[\x00-\x1F\x7F\\\\\/:*?"<>|]+/', '_', basename((string)$f['name']));
+  $name = trim($name) !== '' ? $name : 'attachment.' . DEPOSIT_FILE_TYPES[$type];
+  if (function_exists('mb_substr')) $name = mb_substr($name, 0, 150);
+  return ['tmp' => $f['tmp_name'], 'name' => $name, 'type' => $type, 'size' => (int)$f['size'], 'ext' => DEPOSIT_FILE_TYPES[$type]];
+}
+
+/** Date, amount, method and note of a deposit, checked. $cur fills fields that weren't sent (edit). */
+function deposit_fields(array $in, ?array $cur = null): array {
+  $date = array_key_exists('date', $in) ? trim((string)$in['date']) : (string)($cur['date'] ?? '');
+  if (!preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $date, $m) || !checkdate((int)$m[2], (int)$m[3], (int)$m[1])) fail('Enter the date the money was deposited.');
+  $amountRaw = array_key_exists('amount', $in) ? trim((string)$in['amount']) : (string)($cur['amount'] ?? '');
+  if (!preg_match('/^\d{1,9}$/', $amountRaw) || (int)$amountRaw < 1 || (int)$amountRaw > 100000000) fail('Enter the amount in whole rupees (at least ₹1).');
+  $method = array_key_exists('method', $in) ? trim((string)$in['method']) : (string)($cur['method'] ?? '');
+  if (!in_array($method, DEPOSIT_METHODS, true)) fail('Choose how it was deposited: Bank, UPI or Cash.');
+  $note = array_key_exists('note', $in) ? trim((string)$in['note']) : (string)($cur['note'] ?? '');
+  $len = function_exists('mb_strlen') ? mb_strlen($note) : strlen($note);
+  if ($len > 1000) fail('Keep the note under 1,000 characters.');
+  return ['date' => $date, 'amount' => (int)$amountRaw, 'method' => $method, 'note' => $note];
+}
+
+/** Form fields of a deposit request: multipart (with a file) or JSON. Detects a body PHP dropped for being too large. */
+function deposit_input(): array {
+  $len = (int)($_SERVER['CONTENT_LENGTH'] ?? 0);
+  $max = ini_bytes((string)ini_get('post_max_size'));
+  if ($len > 0 && $max > 0 && $len > $max && empty($_POST) && empty($_FILES)) {
+    fail('The file is too large for the server. Keep it under ' . ini_get('post_max_size') . 'B.', 413);
+  }
+  return $_POST ?: body();
+}
+
 /** An expenses row as the app sees it. */
 function expense_shape(array $e): array {
   return [
@@ -284,7 +394,7 @@ function get_booking(string $ref): ?array {
   return booking_shape($b, $ps->fetchAll());
 }
 
-function bootstrap_payload(): array {
+function bootstrap_payload(array $me): array {
   $pdo = db();
 
   $bookings = $pdo->query('SELECT * FROM bookings ORDER BY created_at DESC, ref DESC')->fetchAll();
@@ -320,5 +430,7 @@ function bootstrap_payload(): array {
     'roles'         => $roles,
     'invoice'       => $invoice,
     'villaOverrides' => (object)$overrides,   // force {} not [] when empty
+    // cash deposits only for those allowed to see them
+    'deposits'      => has_right($me, 'view_deposits') ? deposits_list() : [],
   ];
 }

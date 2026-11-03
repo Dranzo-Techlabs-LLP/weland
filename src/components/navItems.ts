@@ -1,4 +1,5 @@
 import {
+  Banknote,
   BarChart3,
   CalendarCheck2,
   CalendarDays,
@@ -27,6 +28,7 @@ export const navItems: NavItem[] = [
   { to: '/bookings', label: 'Bookings', icon: CalendarCheck2, right: 'view_bookings' },
   { to: '/accounting', label: 'Accounting', icon: Landmark, right: 'view_accounting' },
   { to: '/expenses', label: 'Expenses', icon: Receipt, right: 'view_expenses' },
+  { to: '/deposits', label: 'Cash Deposit', icon: Banknote, right: 'view_deposits' },
   { to: '/reports', label: 'Reports', icon: BarChart3, right: 'view_reports' },
   { to: '/rooms', label: 'Rooms', icon: Home, right: 'view_villas' },
   { to: '/users', label: 'Users', icon: Users, right: 'view_users' },

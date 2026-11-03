@@ -128,7 +128,7 @@ try {
   }
 
   if ($method === 'GET' && $path === 'bootstrap') {
-    json_out(bootstrap_payload());
+    json_out(bootstrap_payload($me));
   }
 
   // ---------- Bookings ----------
@@ -476,6 +476,99 @@ try {
                                            min_guests = VALUES(min_guests), max_guests = VALUES(max_guests)')
         ->execute([$name, $rate, $notes, $min, $max]);
     json_out(['ok' => true, 'override' => public_override($load())]);
+  }
+
+  // ---------- Cash deposits (date, amount, Bank/UPI/Cash, note, one attachment) ----------
+  //  Sent as multipart/form-data (field "file" for the attachment). PHP only reads files on POST,
+  //  so an edit is POST /deposits/{id}. Attachments live outside the web folder and are only
+  //  served through GET /deposits/{id}/attachment to users who may view deposits.
+  if (($seg[0] ?? '') === 'deposits') {
+    $load = function (string $id): array {
+      $st = db()->prepare('SELECT * FROM cash_deposits WHERE id = ?');
+      $st->execute([$id]);
+      $row = $st->fetch();
+      if (!$row) fail('Deposit not found.', 404);
+      return $row;
+    };
+    $store = function (array $file, string $id): string {
+      $stored = $id . '-' . bin2hex(random_bytes(6)) . '.' . $file['ext'];
+      if (!move_uploaded_file($file['tmp'], deposit_upload_dir() . '/' . $stored)) fail('The attachment could not be saved on the server.', 500);
+      return $stored;
+    };
+    $unlink = function (?string $stored): void {
+      if ($stored) @unlink(deposit_upload_dir() . '/' . basename($stored));
+    };
+
+    // add
+    if ($method === 'POST' && count($seg) === 1) {
+      require_right($me, 'edit_deposits');
+      $f = deposit_fields(deposit_input());
+      $file = deposit_upload();
+      $id = gen_id('d');
+      $stored = $file ? $store($file, $id) : null;
+      try {
+        db()->prepare('INSERT INTO cash_deposits (id, date, amount, method, note, file_name, file_path, file_type, file_size, created_by, created_at)
+                       VALUES (?,?,?,?,?,?,?,?,?,?,NOW())')
+            ->execute([$id, $f['date'], $f['amount'], $f['method'], $f['note'] !== '' ? $f['note'] : null,
+                       $file['name'] ?? null, $stored, $file['type'] ?? null, $file['size'] ?? null, (string)$me['name']]);
+      } catch (Throwable $e) {
+        $unlink($stored);
+        throw $e;
+      }
+      json_out(['deposit' => deposit_shape($load($id))], 201);
+    }
+
+    // edit (fields not sent keep their value; a new file replaces the old one; removeAttachment=1 drops it)
+    if ($method === 'POST' && count($seg) === 2) {
+      require_right($me, 'edit_deposits');
+      $cur = $load($seg[1]);
+      $in = deposit_input();
+      $f = deposit_fields($in, $cur);
+      $file = deposit_upload();
+      $remove = !$file && in_array((string)($in['removeAttachment'] ?? ''), ['1', 'true'], true);
+      $stored = $file ? $store($file, $cur['id']) : null;
+      $keep = !$file && !$remove;
+      try {
+        db()->prepare('UPDATE cash_deposits SET date = ?, amount = ?, method = ?, note = ?, file_name = ?, file_path = ?, file_type = ?, file_size = ? WHERE id = ?')
+            ->execute([$f['date'], $f['amount'], $f['method'], $f['note'] !== '' ? $f['note'] : null,
+                       $keep ? $cur['file_name'] : ($file['name'] ?? null),
+                       $keep ? $cur['file_path'] : $stored,
+                       $keep ? $cur['file_type'] : ($file['type'] ?? null),
+                       $keep ? $cur['file_size'] : ($file['size'] ?? null),
+                       $cur['id']]);
+      } catch (Throwable $e) {
+        $unlink($stored);
+        throw $e;
+      }
+      if (!$keep) $unlink($cur['file_path']);
+      json_out(['deposit' => deposit_shape($load($cur['id']))]);
+    }
+
+    if ($method === 'DELETE' && count($seg) === 2) {
+      require_right($me, 'edit_deposits');
+      $cur = $load($seg[1]);
+      db()->prepare('DELETE FROM cash_deposits WHERE id = ?')->execute([$cur['id']]);
+      $unlink($cur['file_path']);
+      json_out(['ok' => true]);
+    }
+
+    // the attachment itself, only for those who may view deposits
+    if ($method === 'GET' && count($seg) === 3 && $seg[2] === 'attachment') {
+      require_right($me, 'view_deposits');
+      $cur = $load($seg[1]);
+      $file = $cur['file_path'] ? deposit_upload_dir() . '/' . basename((string)$cur['file_path']) : '';
+      if ($file === '' || !is_file($file)) fail('This deposit has no attachment.', 404);
+      $type = isset(DEPOSIT_FILE_TYPES[$cur['file_type']]) ? $cur['file_type'] : 'application/octet-stream';
+      $name = (string)$cur['file_name'];
+      $ascii = preg_replace('/[^A-Za-z0-9._-]+/', '_', $name) ?: 'attachment';
+      header('Content-Type: ' . $type);
+      header('Content-Length: ' . filesize($file));
+      header('Content-Disposition: inline; filename="' . $ascii . '"; filename*=UTF-8\'\'' . rawurlencode($name));
+      header('X-Content-Type-Options: nosniff');
+      header('Cache-Control: private, no-store');
+      readfile($file);
+      exit;
+    }
   }
 
   fail("Not found: $method /$path", 404);

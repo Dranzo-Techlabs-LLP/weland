@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { ROOMS } from '../lib/config'
-import { api, ApiError, setToken, type BookingWrite, type UserWrite } from '../lib/api'
+import { api, ApiError, setToken, type BookingWrite, type DepositWrite, type UserWrite } from '../lib/api'
 import { useAuth } from '../auth/AuthContext'
 import type { AppData, Booking, BookingStatus, Expense, InvoiceSettings, Payment, RoomOverride } from '../types'
 
@@ -32,6 +32,7 @@ function emptyData(): AppData {
     roles: [],
     invoice: { prefix: 'KV-', next: 1, padding: 5, terms: '' },
     villaOverrides: {},
+    deposits: [],
   }
 }
 
@@ -44,6 +45,10 @@ interface StoreValue {
   addExpense: (e: Omit<Expense, 'id'>) => Promise<void>
   updateExpense: (id: string, e: Omit<Expense, 'id'>) => Promise<void>
   deleteExpense: (id: string) => Promise<void>
+  /** Cash deposits: add / edit throw so the form can show the message; delete shows it in the banner. */
+  addDeposit: (d: DepositWrite) => Promise<void>
+  updateDeposit: (id: string, d: DepositWrite) => Promise<void>
+  deleteDeposit: (id: string) => Promise<void>
   addUser: (u: UserWrite) => Promise<void>
   updateUser: (id: string, u: UserWrite) => Promise<void>
   setUserActive: (id: string, active: boolean) => Promise<void>
@@ -120,6 +125,24 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const { expense } = await api.updateExpense(id, e)
     setData((d) => ({ ...d, expenses: d.expenses.map((x) => (x.id === id ? expense : x)) }))
     if (e.external !== undefined && expense.external === undefined) throw new Error(OLD_SERVER_EXTERNAL)
+  }), [guard])
+
+  const sortDeposits = (list: AppData['deposits']) =>
+    [...list].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : (b.createdAt ?? '') < (a.createdAt ?? '') ? -1 : 1))
+
+  const addDeposit = useCallback(async (d: DepositWrite) => {
+    const { deposit } = await api.addDeposit(d)
+    setData((x) => ({ ...x, deposits: sortDeposits([deposit, ...x.deposits]) }))
+  }, [])
+
+  const updateDeposit = useCallback(async (id: string, d: DepositWrite) => {
+    const { deposit } = await api.updateDeposit(id, d)
+    setData((x) => ({ ...x, deposits: sortDeposits(x.deposits.map((y) => (y.id === id ? deposit : y))) }))
+  }, [])
+
+  const deleteDeposit = useCallback((id: string) => guard(async () => {
+    await api.deleteDeposit(id)
+    setData((x) => ({ ...x, deposits: x.deposits.filter((y) => y.id !== id) }))
   }), [guard])
 
   const deleteExpense = useCallback((id: string) => guard(async () => {
@@ -246,9 +269,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<StoreValue>(() => ({
     data: view, loading, error, clearError, reload: load,
-    addExpense, updateExpense, deleteExpense, addUser, updateUser, setUserActive, saveRoleRights, addRole,
+    addExpense, updateExpense, deleteExpense, addDeposit, updateDeposit, deleteDeposit, addUser, updateUser, setUserActive, saveRoleRights, addRole,
     saveInvoice, createBooking, updateBooking, deleteBooking, addPayment, updatePayment, deletePayment, setBookingStatus, saveVillaOverride,
-  }), [view, loading, error, clearError, load, addExpense, updateExpense, deleteExpense, addUser, updateUser, setUserActive, saveRoleRights, addRole, saveInvoice, createBooking, updateBooking, deleteBooking, addPayment, updatePayment, deletePayment, setBookingStatus, saveVillaOverride])
+  }), [view, loading, error, clearError, load, addExpense, updateExpense, deleteExpense, addDeposit, updateDeposit, deleteDeposit, addUser, updateUser, setUserActive, saveRoleRights, addRole, saveInvoice, createBooking, updateBooking, deleteBooking, addPayment, updatePayment, deletePayment, setBookingStatus, saveVillaOverride])
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>
 }

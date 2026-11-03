@@ -86,6 +86,21 @@ CREATE TABLE IF NOT EXISTS invoice_settings (
   show_b2b TINYINT(1) NOT NULL DEFAULT 0         -- print the B2B commission on the invoice
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+CREATE TABLE IF NOT EXISTS cash_deposits (
+  id VARCHAR(32) PRIMARY KEY,
+  date DATE NOT NULL,                 -- the day the money was deposited
+  amount INT NOT NULL,
+  method VARCHAR(20) NOT NULL,        -- Bank, UPI or Cash
+  note TEXT NULL,
+  file_name VARCHAR(255) NULL,        -- attachment: original name shown in the app
+  file_path VARCHAR(255) NULL,        -- attachment: stored name (outside the web folder)
+  file_type VARCHAR(100) NULL,
+  file_size INT NULL,
+  created_by VARCHAR(120) NULL,
+  created_at DATETIME NOT NULL,
+  INDEX (date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE IF NOT EXISTS sessions (
   token VARCHAR(64) PRIMARY KEY,
   user_id VARCHAR(32) NOT NULL,

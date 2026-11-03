@@ -53,6 +53,25 @@ export interface Expense {
   external?: boolean // B2B commission collected externally by the partner (not paid out by the resort)
 }
 
+/** The file attached to a cash deposit (a slip photo or PDF); the file itself is fetched on demand. */
+export interface DepositAttachment {
+  name: string
+  type: string
+  size: number
+}
+
+/** Money deposited (to the bank or handed over), by Bank, UPI or Cash. */
+export interface Deposit {
+  id: string
+  date: string // ISO: the day it was deposited
+  amount: number
+  method: string // Bank, UPI or Cash
+  note: string
+  attachment: DepositAttachment | null
+  createdBy: string
+  createdAt?: string | null
+}
+
 export interface User {
   id: string
   name: string
@@ -96,6 +115,7 @@ export interface AppData {
   roles: Role[]
   invoice: InvoiceSettings
   villaOverrides: Record<string, RoomOverride>
+  deposits: Deposit[] // only filled for users who may view cash deposits
 }
 
 export interface AuthUser {

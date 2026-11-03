@@ -4,6 +4,8 @@ export const PERMISSIONS: { key: string; label: string }[] = [
   { key: 'record_payments', label: 'Record payments / refunds' },
   { key: 'view_expenses', label: 'View expenses' },
   { key: 'edit_expenses', label: 'Add / edit expenses' },
+  { key: 'view_deposits', label: 'View cash deposits' },
+  { key: 'edit_deposits', label: 'Add / edit cash deposits' },
   { key: 'view_accounting', label: 'View revenue & accounting' },
   { key: 'view_users', label: 'View users' },
   { key: 'manage_users', label: 'Add / edit users & rights' },
@@ -25,7 +27,7 @@ export const ROLE_DEFAULTS: Record<string, string[]> = {
   Manager: [
     'view_dashboard', 'view_calendar', 'view_bookings', 'edit_bookings', 'cancel_bookings',
     'view_accounting', 'view_expenses', 'edit_expenses', 'view_reports', 'view_villas',
-    'view_payments', 'record_payments', 'view_users',
+    'view_payments', 'record_payments', 'view_users', 'view_deposits', 'edit_deposits',
   ],
   'Front Desk': [
     'view_dashboard', 'view_calendar', 'view_bookings', 'edit_bookings',
@@ -34,7 +36,7 @@ export const ROLE_DEFAULTS: Record<string, string[]> = {
   B2B: ['view_dashboard', 'view_calendar', 'view_bookings', 'edit_bookings'],
   Owner: [
     'view_dashboard', 'view_calendar', 'view_bookings', 'view_accounting',
-    'view_expenses', 'view_reports', 'view_villas', 'view_payments',
+    'view_expenses', 'view_reports', 'view_villas', 'view_payments', 'view_deposits',
   ],
 }
 
@@ -55,6 +57,16 @@ export const CATEGORY_PILL: Record<string, string> = {
 }
 
 export const PAYMENT_METHODS = ['Cash', 'UPI', 'Card', 'Bank transfer']
+
+/** How a cash deposit was made (Cash Deposit page). */
+export const DEPOSIT_METHODS = ['Bank', 'UPI', 'Cash']
+
+/** Soft-tinted pill classes per deposit method. */
+export const DEPOSIT_PILL: Record<string, string> = {
+  Bank: 'bg-sky-100 text-sky-700',
+  UPI: 'bg-violet-100 text-violet-700',
+  Cash: 'bg-emerald-100 text-emerald-700',
+}
 
 export const BOOKING_STATUSES = [
   'enquiry', 'hold', 'confirmed', 'checked in', 'completed', 'cancelled',

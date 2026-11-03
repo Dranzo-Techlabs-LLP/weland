@@ -3,7 +3,8 @@
 --  (several rooms / Full Property, adults + kids, notes, alternate
 --   mobile, payment method + reference, advance payment), the user's
 --  room, room capacity (Party Hall), and the invoice's "show on invoice"
---  options (payment entries, B2B commission), and "B2B collected externally"
+--  options (payment entries, B2B commission), "B2B collected externally",
+--  and the Cash Deposit page (table + rights for Administrator, Manager, Owner)
 --
 --  phpMyAdmin → click the "weland" database → SQL tab → paste all of
 --  this → Go.
@@ -100,3 +101,28 @@ SET @add = (SELECT COUNT(*) = 0 FROM information_schema.COLUMNS
              WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'expenses' AND COLUMN_NAME = 'external');
 SET @sql = IF(@add, 'ALTER TABLE expenses ADD COLUMN `external` TINYINT(1) NOT NULL DEFAULT 0 AFTER amount', 'DO 0');
 PREPARE step FROM @sql; EXECUTE step; DEALLOCATE PREPARE step;
+
+-- Cash Deposit page: one row per deposit (date, amount, Bank/UPI/Cash, note, attachment details)
+SET @newDeposits = (SELECT COUNT(*) = 0 FROM information_schema.TABLES
+                     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'cash_deposits');
+CREATE TABLE IF NOT EXISTS cash_deposits (
+  id VARCHAR(32) PRIMARY KEY,
+  date DATE NOT NULL,                 -- the day the money was deposited
+  amount INT NOT NULL,
+  method VARCHAR(20) NOT NULL,        -- Bank, UPI or Cash
+  note TEXT NULL,
+  file_name VARCHAR(255) NULL,        -- attachment: original name shown in the app
+  file_path VARCHAR(255) NULL,        -- attachment: stored name (outside the web folder)
+  file_type VARCHAR(100) NULL,
+  file_size INT NULL,
+  created_by VARCHAR(120) NULL,
+  created_at DATETIME NOT NULL,
+  INDEX (date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Cash Deposit rights for the built-in roles, given once when the table is first created
+-- (a later run leaves Roles & Rights as you set them)
+UPDATE roles SET rights = JSON_ARRAY_APPEND(rights, '$', 'view_deposits')
+ WHERE @newDeposits = 1 AND name IN ('Administrator', 'Manager', 'Owner') AND JSON_VALID(rights) AND NOT JSON_CONTAINS(rights, '"view_deposits"');
+UPDATE roles SET rights = JSON_ARRAY_APPEND(rights, '$', 'edit_deposits')
+ WHERE @newDeposits = 1 AND name IN ('Administrator', 'Manager') AND JSON_VALID(rights) AND NOT JSON_CONTAINS(rights, '"edit_deposits"');
