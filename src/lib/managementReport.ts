@@ -303,11 +303,13 @@ export function managementModel(data: AppData, o: ManagementOptions): Management
 
 // ---------------------------------------------------------------- look
 
-// Brand colours from the logo (maroon and gold), with warm neutrals
+// Brand colours from the logo (maroon and gold), with warm neutrals. Text, labels and lines are dark
+// enough to stay clear on a printout: pale lines and small grey or tan text fade on paper.
+// faded = rows the totals leave out (lighter than the text, still readable); goldTab = ledger sheet tabs (never printed).
 const C = {
-  maroon: '5E2432', maroonDark: '45182A', gold: 'E8CF96', goldDeep: 'A8844F', goldTint: 'F7EEDC',
-  maroonTint: 'F5ECEE', cream: 'FBF8F3', ink: '1E293B', muted: '6B7280', line: 'E6E0D6',
-  white: 'FFFFFF', green: '047857', red: 'B91C1C',
+  maroon: '5E2432', maroonDark: '45182A', gold: 'E8CF96', goldDeep: '6B4C1E', goldTab: 'A8844F', goldTint: 'F7EEDC',
+  maroonTint: 'F5ECEE', cream: 'FBF8F3', muted: '374151', faded: '5B6472', line: '9E9486',
+  white: 'FFFFFF', green: '065F46', red: '991B1B',
 }
 const thin = (color: string): BorderSide => ({ style: 'thin', color })
 const grid = { top: thin(C.line), bottom: thin(C.line), left: thin(C.line), right: thin(C.line) }
@@ -328,20 +330,21 @@ function themeOf(wb: Workbook) {
     bandSub: st({ fill: C.maroon, size: 10, color: 'F3E9DA', h: 'left', indent: 1 }),
     rule: st({ fill: C.gold }),
     title: st({ bold: true, size: 15, color: C.maroon, h: 'left' }),
-    desc: st({ italic: true, size: 9.5, color: C.muted, h: 'left' }),
+    desc: st({ italic: true, size: 10, color: C.muted, h: 'left', wrap: true }),
     th: (kind: Kind = 'text') => st({
       bold: true, size: 10, color: C.white, fill: C.maroon, h: kind === 'text' ? 'left' : kind === 'month' ? 'right' : 'center', indent: kind === 'text' ? 1 : undefined, wrap: true,
       top: thin(C.maroonDark), bottom: thin(C.maroonDark), left: thin(C.maroonDark), right: thin(C.maroonDark), fmt: kind === 'month' ? 'month' : undefined,
     }),
-    td: (kind: Kind, alt: boolean, o: { muted?: boolean; v?: CellValue } = {}) => st({
+    // muted: a row the totals leave out; note: an explanatory cell
+    td: (kind: Kind, alt: boolean, o: { muted?: boolean; note?: boolean; v?: CellValue } = {}) => st({
       ...grid, fill: alt ? C.cream : undefined, fmt: fmtOf(kind, o.v), h: ALIGN[kind], indent: indentOf(kind), size: 10,
-      italic: o.muted || undefined, color: isNeg(kind, o.v) ? C.red : o.muted ? C.muted : undefined,
+      italic: o.muted || o.note || undefined, color: isNeg(kind, o.v) ? C.red : o.muted ? C.faded : o.note ? C.muted : undefined,
     }),
     total: (kind: Kind, v?: CellValue) => st({
       bold: true, size: 10, color: isNeg(kind, v) ? C.red : C.maroon, fill: C.goldTint, fmt: fmtOf(kind, v), h: ALIGN[kind], indent: indentOf(kind),
       top: thin(C.maroon), bottom: { style: 'double', color: C.maroon }, left: thin(C.line), right: thin(C.line),
     }),
-    section: st({ bold: true, size: 10, color: C.maroon, fill: C.maroonTint, h: 'left', indent: 1, bottom: thin(C.gold), top: thin(C.line) }),
+    section: st({ bold: true, size: 10, color: C.maroon, fill: C.maroonTint, h: 'left', indent: 1, bottom: thin(C.goldDeep), top: thin(C.line) }),
     // statement lines (P&L, Cash Flow, Dashboard)
     line: (kind: Kind, o: { memo?: boolean; level?: 'item' | 'sub' | 'grand'; v?: CellValue; tone?: boolean } = {}) => {
       const level = o.level ?? 'item'
@@ -350,18 +353,18 @@ function themeOf(wb: Workbook) {
       const base: CellStyle = { size: 10, fmt: fmtOf(kind, o.v), h: ALIGN[kind], indent: kind === 'text' ? (level === 'item' ? 2 : 1) : undefined, color, italic: o.memo || undefined }
       if (level === 'sub') return st({ ...base, bold: true, top: thin(C.goldDeep), bottom: thin(C.line) })
       if (level === 'grand') return st({ ...base, bold: true, fill: C.goldTint, top: thin(C.maroon), bottom: { style: 'double', color: C.maroon } })
-      return st({ ...base, bottom: { style: 'hair', color: C.line } })
+      return st({ ...base, bottom: thin(C.line) })
     },
     note: st({ size: 10, h: 'left', v: 'top', wrap: true }),
     noteNum: st({ size: 10, bold: true, color: C.maroon, h: 'right', v: 'top' }),
-    key: st({ size: 10, color: C.muted, h: 'left', indent: 1, bottom: { style: 'hair', color: C.line } }),
-    value: st({ size: 10, bold: true, h: 'left', indent: 1, bottom: { style: 'hair', color: C.line } }),
+    key: st({ size: 10, color: C.muted, h: 'left', indent: 1, bottom: thin(C.line) }),
+    value: st({ size: 10, bold: true, h: 'left', indent: 1, bottom: thin(C.line) }),
     empty: st({ italic: true, size: 10, color: C.muted, h: 'left', indent: 1, ...grid }),
     tile: (part: 'label' | 'value' | 'sub', side: 'l' | 'r', o: { fmt?: NumFmt; color?: string } = {}) => {
       const edge = side === 'l' ? { left: thin(C.line) } : { right: thin(C.line) }
-      if (part === 'label') return st({ ...edge, fill: C.cream, bold: true, size: 8.5, color: C.goldDeep, h: 'left', indent: 1, v: 'bottom', top: { style: 'medium', color: C.gold } })
+      if (part === 'label') return st({ ...edge, fill: C.cream, bold: true, size: 10, color: C.goldDeep, h: 'left', indent: 1, v: 'bottom', top: { style: 'medium', color: C.goldDeep } })
       if (part === 'value') return st({ ...edge, fill: C.cream, bold: true, size: 18, color: o.color ?? C.maroon, h: 'left', indent: 1, fmt: o.fmt })
-      return st({ ...edge, fill: C.cream, size: 9, color: C.muted, h: 'left', indent: 1, v: 'top', bottom: thin(C.line), wrap: true })
+      return st({ ...edge, fill: C.cream, size: 10, color: C.muted, h: 'left', indent: 1, v: 'top', bottom: thin(C.line), wrap: true })
     },
   }
 }
@@ -383,7 +386,10 @@ function mark(ctx: Ctx, key: string, sh: Sheet, row: number, col: number, v: num
 /** Brand header on every sheet: logo + resort name on a maroon band, a gold rule, then the sheet title and description. */
 function frame(sh: Sheet, ctx: Ctx, lastCol: number, title: string, desc: string) {
   const { t } = ctx
-  sh.height(1, 30); sh.height(2, 22); sh.height(3, 4); sh.height(4, 28); sh.height(5, 18); sh.height(6, 6)
+  // a description longer than the sheet is wide wraps onto more lines (about 1.15 characters per width unit at 10 pt)
+  const room = sh.widths.slice(1, lastCol + 1).reduce((a, w) => a + w, 0)
+  const lines = room ? Math.max(1, Math.ceil(desc.length / (room * 1.15))) : 1
+  sh.height(1, 30); sh.height(2, 22); sh.height(3, 4); sh.height(4, 28); sh.height(5, 5 + 13 * lines); sh.height(6, 6)
   for (let c = 0; c <= lastCol; c++) {
     sh.set(1, c, null, t.band)
     sh.set(2, c, null, t.band)
@@ -491,12 +497,14 @@ interface DashLine { id?: string; label: string; value: number; kind?: 'money' |
  */
 function dashSection(sh: Sheet, ctx: Ctx, refs: Record<string, string>, row: number, col: number, title: string, caption: string, lines: DashLine[]): number {
   const { t, wb } = ctx
-  sh.height(row, 22)
+  // the two columns share rows: never lower a row the other column has already made taller
+  const grow = (r: number, h: number) => sh.height(r, Math.max(sh.heights.get(r) ?? 0, h))
+  grow(row, 22)
   sh.set(row, col, title, t.section)
   sh.set(row, col + 1, null, t.section)
-  sh.set(row + 1, col, caption, wb.style({ italic: true, size: 9, color: C.muted, h: 'left', indent: 1 }))
+  sh.set(row + 1, col, caption, wb.style({ italic: true, size: 10, color: C.muted, h: 'left', indent: 1 }))
   sh.merge(row + 1, col, row + 1, col + 1)
-  sh.height(row + 1, 16)
+  grow(row + 1, 16)
   let r = row + 2
   for (const l of lines) {
     const kind = l.kind ?? 'money'
@@ -505,13 +513,13 @@ function dashSection(sh: Sheet, ctx: Ctx, refs: Record<string, string>, row: num
       refs[l.id] = ref(col + 1, r)
       mark(ctx, `dash.${l.id}`, sh, r, col + 1, l.value)
     }
-    sh.height(r, level === 'item' ? 19 : 22)
+    grow(r, level === 'item' ? 19 : 22)
     sh.set(r, col, l.label, t.line('text', { level, memo: l.memo }))
     const f = l.f?.replace(/\{(\w+)\}/g, (_, id: string) => refs[id] ?? '0')
     sh.set(r, col + 1, l.value, t.line(kind, { level, memo: l.memo, v: l.value, tone: l.tone }), f)
     r += 1
   }
-  sh.height(r, 12)
+  grow(r, 12)
   return r + 1
 }
 
@@ -562,7 +570,7 @@ function dashboard(ctx: Ctx) {
   const refs: Record<string, string> = {}
   let left = 20
   // the same terms as Reports → Payments & Refunds: payments before refunds, then refunds, then net
-  const when = stay ? 'for stays checking in during the period (any payment date)' : 'by payment date'
+  const when = stay ? 'stays checking in, any payment date' : 'by payment date'
   left = dashSection(sh, ctx, refs, left, 1, '1 · COLLECTED BY BANK & DIGITAL', `UPI, card and bank transfer, ${when}`, [
     { id: 'bAdv', label: 'Advances received', value: k.bankAdvance },
     { id: 'bBal', label: 'Balance payments received', value: k.bankBalance },
@@ -923,7 +931,7 @@ function roomSummary(ctx: Ctx) {
 function receivables(ctx: Ctx) {
   const { wb, m } = ctx
   const sh = wb.sheet('Receivables')
-  sh.tabColor = C.goldDeep
+  sh.tabColor = C.goldTab
   sh.paper = 'A3'
   const cols: Col[] = [
     { title: 'Booking ID', width: 12, kind: 'text' },
@@ -960,7 +968,7 @@ function receivables(ctx: Ctx) {
 function b2bSheet(ctx: Ctx) {
   const { wb, m } = ctx
   const sh = wb.sheet('B2B Commission')
-  sh.tabColor = C.goldDeep
+  sh.tabColor = C.goldTab
   const cols: Col[] = [
     { title: 'Booking ID', width: 12, kind: 'text' },
     { title: 'Guest', width: 24, kind: 'text' },
@@ -1009,7 +1017,7 @@ function b2bSheet(ctx: Ctx) {
 function bookingsSheet(ctx: Ctx) {
   const { wb, m } = ctx
   const sh = wb.sheet('Bookings')
-  sh.tabColor = C.goldDeep
+  sh.tabColor = C.goldTab
   sh.paper = 'A3'
   const cols: Col[] = [
     { title: 'Booking ID', width: 12, kind: 'text' },
@@ -1073,14 +1081,14 @@ function bookingsSheet(ctx: Ctx) {
 function paymentsSheet(ctx: Ctx) {
   const { wb, m } = ctx
   const sh = wb.sheet('Payments')
-  sh.tabColor = C.goldDeep
+  sh.tabColor = C.goldTab
   const cols: Col[] = [
-    { title: 'Date', width: 13, kind: 'date' },
+    { title: 'Date', width: 12, kind: 'date' },
     { title: 'Booking ID', width: 12, kind: 'text' },
     { title: 'Guest', width: 24, kind: 'text' },
     { title: 'Room(s)', width: 16, kind: 'text' },
-    { title: 'Check-in', width: 13, kind: 'date' },
-    { title: 'Type', width: 15, kind: 'text' },
+    { title: 'Check-in', width: 12, kind: 'date' },
+    { title: 'Type', width: 17, kind: 'text' },
     { title: 'Method', width: 13, kind: 'text' },
     { title: 'Received Via', width: 15, kind: 'text' },
     { title: 'Reference', width: 18, kind: 'text' },
@@ -1118,7 +1126,7 @@ function paymentsSheet(ctx: Ctx) {
 function expensesSheet(ctx: Ctx) {
   const { wb, m } = ctx
   const sh = wb.sheet('Expenses')
-  sh.tabColor = C.goldDeep
+  sh.tabColor = C.goldTab
   const cols: Col[] = [
     { title: 'Date', width: 13, kind: 'date' },
     { title: 'Category', width: 16, kind: 'text' },
@@ -1309,7 +1317,7 @@ function balanceCheck(ctx: Ctx, data: AppData) {
     sh.set(r, 1, text, t.section)
     for (let c = 2; c <= 6; c++) sh.set(r, c, null, t.section)
     sh.height(r, 20)
-    sh.height(r + 1, 30)
+    sh.height(r + 1, 24)
     cols.forEach((c, i) => sh.set(r + 1, 1 + i, c, t.th(i === 0 || i === 5 ? 'text' : 'center')))
     return r + 2
   }
@@ -1324,7 +1332,8 @@ function balanceCheck(ctx: Ctx, data: AppData) {
       const ok = Math.abs(diff - expected) < 0.5
       if (!ok) failures += 1
       const status = ok ? (expected ? '✓ Explained' : '✓ Balanced') : '✗ Check'
-      sh.height(r, 20)
+      // compact rows, so the one-page sheet prints larger
+      sh.height(r, 16)
       sh.set(r, 1, ch.label, t.td('text', alt))
       // a figure from Weland's screens is a plain number; one from this workbook is a live reference
       const formula = (mk: Mark) => (/^-?\d+(\.\d+)?$/.test(mk.ref) ? undefined : mk.ref)
@@ -1333,7 +1342,7 @@ function balanceCheck(ctx: Ctx, data: AppData) {
       sh.set(r, 4, diff, t.td(kind, alt, { v: diff }), `${ref(2, r)}-${ref(3, r)}`)
       sh.set(r, 5, status, wb.style({ ...grid, fill: alt ? C.cream : undefined, bold: true, size: 10, h: 'center', color: ok ? C.green : C.red }),
         `IF(ABS(${ref(4, r)}-(${expected}))<0.5,"${expected ? '✓ Explained' : '✓ Balanced'}","✗ Check")`)
-      sh.set(r, 6, ch.where, t.td('text', alt, { muted: true }))
+      sh.set(r, 6, ch.where, t.td('text', alt, { note: true }))
       r += 1
     })
     return r
@@ -1362,7 +1371,7 @@ function balanceCheck(ctx: Ctx, data: AppData) {
 function depositsSheet(ctx: Ctx) {
   const { wb, m } = ctx
   const sh = wb.sheet('Cash Deposits')
-  sh.tabColor = C.goldDeep
+  sh.tabColor = C.goldTab
   const cols: Col[] = [
     { title: 'Date', width: 13, kind: 'date' },
     { title: 'Deposited Via', width: 14, kind: 'text' },
@@ -1395,7 +1404,7 @@ function setupSheet(ctx: Ctx, o: { generatedAt: Date; generatedBy?: string; depo
   const sh = wb.sheet('Setup & Notes')
   sh.tabColor = '64748B'
   sh.landscape = false
-  sh.fitPage = true
+  sh.fitPage = false // one page wide, as many pages long as the notes need (one page would print them at about 6 pt)
   sh.widths = [10, 28, 16, 16, 16, 40]
   frame(sh, ctx, 5, 'Setup & Notes', 'What this workbook covers, the property set-up behind it, and how each figure is worked out.')
   const head = (r: number, text: string) => {
@@ -1489,7 +1498,7 @@ export function buildManagementReport(data: AppData, o: ManagementOptions & { ge
     capacity: Object.fromEntries(ROOMS.map((r) => [r.name, capacityOf(r.name, data)])),
     marks: {},
     subtitle: `Management Report  ·  ${m.periodLabel}  ·  ${m.villa}  ·  ${m.basis === 'stay' ? 'Stay month' : 'Cash date'}  ·  Generated ${fmtDate(toISO(o.generatedAt))}`,
-    footer: `&L&8${RESORT.name} · Management Report · ${m.periodLabel}&R&8Page &P of &N`,
+    footer: `&L&9${RESORT.name} · Management Report · ${m.periodLabel}&R&9Page &P of &N`,
   }
   dashboard(ctx)
   pnl(ctx)

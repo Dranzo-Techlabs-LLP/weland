@@ -61,7 +61,7 @@ export function inrFmt(v: number): NumFmt {
   return v > -10000000 ? 'inrNegL' : 'inrNegC'
 }
 
-const DEFAULT_FONT = { size: 10.5, color: '1E293B' }
+const DEFAULT_FONT = { size: 10.5, color: '111827' } // near-black, so printed text stays crisp
 
 class StyleTable {
   private fonts: string[] = [fontXml({})]
@@ -211,7 +211,7 @@ ${bars}
 <printOptions horizontalCentered="1"/>
 <pageMargins left="0.4" right="0.4" top="0.5" bottom="0.6" header="0.25" footer="0.3"/>
 <pageSetup paperSize="${this.paper === 'A3' ? 8 : 9}" orientation="${this.landscape ? 'landscape' : 'portrait'}" fitToWidth="1" fitToHeight="${this.fitPage ? 1 : 0}"/>
-${this.footer ? `<headerFooter><oddFooter>${xmlEsc(this.footer)}</oddFooter></headerFooter>` : ''}
+${this.footer ? `<headerFooter scaleWithDoc="0"><oddFooter>${xmlEsc(this.footer)}</oddFooter></headerFooter>` : ''}
 ${hasLogo && this.logo ? '<drawing r:id="rId1"/>' : ''}
 </worksheet>`
   }
