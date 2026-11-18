@@ -3,8 +3,10 @@ import { Link } from 'react-router-dom'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useStore } from '../data/store'
 import { bookingHasRoom, bookingRooms, FULL_PROPERTY, ROOMS, ROOM_OPTIONS, roomColor } from '../lib/config'
-import { monthLabel, parseISO, TODAY } from '../lib/format'
+import { fmtDate, monthLabel, parseISO, toISO, TODAY } from '../lib/format'
 import { secondaryBtnCls, selectCls } from '../components/styles'
+import { Modal } from '../components/ui/Modal'
+import { StatusPill } from '../components/ui/StatusPill'
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const DAY = 86400000
@@ -23,12 +25,23 @@ function sameDay(a: Date, b: Date) { return a.getFullYear() === b.getFullYear() 
 const barRooms = (villa: string) => (villa === FULL_PROPERTY ? [FULL_PROPERTY] : bookingRooms(villa).filter((r, i, all) => all.indexOf(r) === i))
 const roomCode = (name: string) => (name === FULL_PROPERTY ? 'FULL' : ROOMS.find((r) => r.name === name)?.code ?? name)
 
+function RoomBoxes({ villa }: { villa: string }) {
+  return (
+    <span className="flex shrink-0 gap-0.5">
+      {barRooms(villa).map((r) => (
+        <span key={r} className="rounded-[3px] px-1 text-[9px] font-bold leading-[15px] text-white shadow-sm" style={{ backgroundColor: roomColor(r) }}>{roomCode(r)}</span>
+      ))}
+    </span>
+  )
+}
+
 interface Seg { ref: string; guest: string; villa: string; status: string; startCol: number; endCol: number; isStart: boolean; isEnd: boolean; lane: number }
 
 export function Calendar() {
   const { data } = useStore()
   const [cursor, setCursor] = useState(new Date(TODAY.getFullYear(), TODAY.getMonth(), 1))
   const [villa, setVilla] = useState('All rooms')
+  const [openDay, setOpenDay] = useState<Date | null>(null) // the day whose full booking list is shown
   const year = cursor.getFullYear()
   const month = cursor.getMonth()
 
@@ -50,6 +63,13 @@ export function Calendar() {
     }
     return out
   }, [year, month])
+
+  // every booking staying the night of `day` (check-in up to the night before check-out)
+  function bookingsOn(day: Date) {
+    return bookings
+      .filter((b) => parseISO(b.checkIn).getTime() <= day.getTime() && parseISO(b.checkOut).getTime() > day.getTime())
+      .sort((a, b) => a.checkIn.localeCompare(b.checkIn) || a.guest.localeCompare(b.guest, undefined, { numeric: true }))
+  }
 
   function segmentsForWeek(week: Date[]): Seg[] {
     const day0 = week[0]
@@ -119,11 +139,16 @@ export function Calendar() {
                   const inMonth = d.getMonth() === month
                   const isToday = sameDay(d, TODAY)
                   return (
-                    <div key={di} className="border-r border-slate-100 p-1.5 last:border-0">
+                    <div key={di} className="relative border-r border-slate-100 p-1.5 last:border-0">
                       <div className="flex justify-end">
                         <span className={`nums flex h-6 w-6 items-center justify-center rounded-full text-xs ${isToday ? 'bg-emerald-700 font-semibold text-white' : inMonth ? 'text-slate-600' : 'text-slate-300'}`}>{d.getDate()}</span>
                       </div>
-                      {hiddenByDay[di] > 0 && <div className="mt-auto pt-1 text-center text-[10px] font-medium text-slate-400">+{hiddenByDay[di]} more</div>}
+                      {/* below the bars, so it is never covered; opens the day's full list */}
+                      {hiddenByDay[di] > 0 && (
+                        <button onClick={() => setOpenDay(d)} className="absolute inset-x-1 bottom-1 rounded px-1 text-center text-[10px] font-semibold leading-[14px] text-emerald-700 hover:bg-emerald-50">
+                          +{hiddenByDay[di]} more
+                        </button>
+                      )}
                     </div>
                   )
                 })}
@@ -132,16 +157,11 @@ export function Calendar() {
                     const leftPct = (s.startCol / 7) * 100
                     const widthPct = ((s.endCol - s.startCol + 1) / 7) * 100
                     const badge = s.isStart ? STATUS_BADGE[s.status] : ''
-                    const rooms = barRooms(s.villa)
                     return (
                       <Link key={i} to={`/bookings/${s.ref}`} title={`${s.guest} · ${s.villa} · ${s.status}`}
                         className={`pointer-events-auto absolute flex items-center gap-1 overflow-hidden bg-slate-200 pl-0.5 pr-1.5 text-[11px] font-medium leading-[18px] text-slate-800 transition hover:bg-slate-300 ${s.isStart ? 'rounded-l-md' : ''} ${s.isEnd ? 'rounded-r-md' : ''}`}
                         style={{ left: `calc(${leftPct}% + 3px)`, width: `calc(${widthPct}% - 6px)`, top: s.lane * (LANE_H + 2), height: LANE_H }}>
-                        <span className="flex shrink-0 gap-0.5">
-                          {rooms.map((r) => (
-                            <span key={r} className="rounded-[3px] px-1 text-[9px] font-bold leading-[15px] text-white shadow-sm" style={{ backgroundColor: roomColor(r) }}>{roomCode(r)}</span>
-                          ))}
-                        </span>
+                        <RoomBoxes villa={s.villa} />
                         <span className="min-w-0 truncate">{s.isStart ? s.guest : ' '}</span>
                         {badge && <span className="shrink-0 rounded bg-white px-1 text-[9px] font-bold leading-none">{badge}</span>}
                       </Link>
@@ -165,6 +185,28 @@ export function Calendar() {
         </span>
         <span className="text-slate-400">· each booking shows a box for each of its rooms</span>
       </div>
+
+      {openDay && (() => {
+        const list = bookingsOn(openDay)
+        return (
+          <Modal title={`${list.length} booking${list.length === 1 ? '' : 's'} on ${fmtDate(toISO(openDay))}`} onClose={() => setOpenDay(null)}>
+            <ul className="-my-1 max-h-[60vh] divide-y divide-slate-100 overflow-y-auto overflow-x-hidden">
+              {list.map((b) => (
+                <li key={b.ref}>
+                  <Link to={`/bookings/${b.ref}`} className="flex items-center gap-3 rounded-lg px-1 py-2 hover:bg-slate-50">
+                    <span className="flex min-w-[4.5rem] shrink-0"><RoomBoxes villa={b.villa} /></span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-medium text-slate-900">{b.guest}</span>
+                      <span className="block text-xs text-slate-500">{b.ref} · {fmtDate(b.checkIn)} – {fmtDate(b.checkOut)}</span>
+                    </span>
+                    <StatusPill status={b.status} />
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </Modal>
+        )
+      })()}
     </>
   )
 }
