@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useStore } from '../data/store'
-import { bookingHasRoom, FULL_PROPERTY, ROOMS, ROOM_OPTIONS, roomColor } from '../lib/config'
+import { bookingHasRoom, bookingRooms, FULL_PROPERTY, ROOMS, ROOM_OPTIONS, roomColor } from '../lib/config'
 import { monthLabel, parseISO, TODAY } from '../lib/format'
 import { secondaryBtnCls, selectCls } from '../components/styles'
 
@@ -17,6 +17,11 @@ const STATUS_BADGE: Record<string, string> = { hold: 'H', enquiry: 'E', 'checked
 function startOfDay(d: Date) { return new Date(d.getFullYear(), d.getMonth(), d.getDate()) }
 function addDays(d: Date, n: number) { return new Date(d.getFullYear(), d.getMonth(), d.getDate() + n) }
 function sameDay(a: Date, b: Date) { return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate() }
+
+// Every booking is a light grey bar across its days, with one small box per room in that room's color,
+// labelled with its code (Full Property: one FULL box).
+const barRooms = (villa: string) => (villa === FULL_PROPERTY ? [FULL_PROPERTY] : bookingRooms(villa).filter((r, i, all) => all.indexOf(r) === i))
+const roomCode = (name: string) => (name === FULL_PROPERTY ? 'FULL' : ROOMS.find((r) => r.name === name)?.code ?? name)
 
 interface Seg { ref: string; guest: string; villa: string; status: string; startCol: number; endCol: number; isStart: boolean; isEnd: boolean; lane: number }
 
@@ -127,12 +132,18 @@ export function Calendar() {
                     const leftPct = (s.startCol / 7) * 100
                     const widthPct = ((s.endCol - s.startCol + 1) / 7) * 100
                     const badge = s.isStart ? STATUS_BADGE[s.status] : ''
+                    const rooms = barRooms(s.villa)
                     return (
                       <Link key={i} to={`/bookings/${s.ref}`} title={`${s.guest} · ${s.villa} · ${s.status}`}
-                        className={`pointer-events-auto absolute flex items-center gap-1 px-1.5 text-[11px] font-medium leading-[18px] text-white shadow-sm transition hover:brightness-110 hover:ring-2 hover:ring-slate-900/10 ${s.isStart ? 'rounded-l-md' : ''} ${s.isEnd ? 'rounded-r-md' : ''}`}
-                        style={{ left: `calc(${leftPct}% + 3px)`, width: `calc(${widthPct}% - 6px)`, top: s.lane * (LANE_H + 2), height: LANE_H, backgroundColor: roomColor(s.villa) }}>
-                        <span className="flex-1 truncate">{s.isStart ? s.guest : ' '}</span>
-                        {badge && <span className="shrink-0 rounded bg-white/25 px-1 text-[9px] font-bold leading-none">{badge}</span>}
+                        className={`pointer-events-auto absolute flex items-center gap-1 overflow-hidden bg-slate-200 pl-0.5 pr-1.5 text-[11px] font-medium leading-[18px] text-slate-800 transition hover:bg-slate-300 ${s.isStart ? 'rounded-l-md' : ''} ${s.isEnd ? 'rounded-r-md' : ''}`}
+                        style={{ left: `calc(${leftPct}% + 3px)`, width: `calc(${widthPct}% - 6px)`, top: s.lane * (LANE_H + 2), height: LANE_H }}>
+                        <span className="flex shrink-0 gap-0.5">
+                          {rooms.map((r) => (
+                            <span key={r} className="rounded-[3px] px-1 text-[9px] font-bold leading-[15px] text-white shadow-sm" style={{ backgroundColor: roomColor(r) }}>{roomCode(r)}</span>
+                          ))}
+                        </span>
+                        <span className="min-w-0 truncate">{s.isStart ? s.guest : ' '}</span>
+                        {badge && <span className="shrink-0 rounded bg-white px-1 text-[9px] font-bold leading-none">{badge}</span>}
                       </Link>
                     )
                   })}
@@ -152,7 +163,7 @@ export function Calendar() {
         <span className="inline-flex items-center gap-1.5">
           <span className="inline-block h-2.5 w-4 rounded-sm" style={{ backgroundColor: roomColor(FULL_PROPERTY) }} />{FULL_PROPERTY}
         </span>
-        <span className="text-slate-400">· multi-room bookings use their first room's color</span>
+        <span className="text-slate-400">· each booking shows a box for each of its rooms</span>
       </div>
     </>
   )
